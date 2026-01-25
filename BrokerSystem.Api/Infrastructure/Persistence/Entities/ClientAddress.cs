@@ -46,6 +46,6 @@ public partial class ClientAddress
     public bool IsCurrent { get; set; }
 
     [ForeignKey("ClientId")]
-    [InverseProperty("ClientAddress")]
+    [InverseProperty("ClientAddresses")]
     public virtual Client Client { get; set; } = null!;
 }

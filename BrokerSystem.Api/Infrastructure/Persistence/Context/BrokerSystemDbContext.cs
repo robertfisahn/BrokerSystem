@@ -140,7 +140,7 @@ public partial class BrokerSystemDbContext : DbContext
             entity.Property(e => e.IsCurrent).HasDefaultValue(true);
             entity.Property(e => e.ValidFrom).HasDefaultValueSql("(getdate())");
 
-            entity.HasOne(d => d.Client).WithOne(p => p.ClientAddress).HasConstraintName("FK_client_addresses_clients");
+            entity.HasOne(d => d.Client).WithMany(p => p.ClientAddresses).HasConstraintName("FK_client_addresses_clients");
         });
 
         modelBuilder.Entity<ClientContact>(entity =>
@@ -149,7 +149,7 @@ public partial class BrokerSystemDbContext : DbContext
                 .IsUnique()
                 .HasFilter("([is_primary]=(1))");
 
-            entity.HasOne(d => d.Client).WithOne(p => p.ClientContact).HasConstraintName("FK_client_contacts_clients");
+            entity.HasOne(d => d.Client).WithMany(p => p.ClientContacts).HasConstraintName("FK_client_contacts_clients");
         });
 
         modelBuilder.Entity<ClientType>(entity =>

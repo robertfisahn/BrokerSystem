@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 
 namespace BrokerSystem.Api.Infrastructure.Persistence.Entities;
 
@@ -51,10 +48,10 @@ public partial class Client
     public DateTime UpdatedAt { get; set; }
 
     [InverseProperty("Client")]
-    public virtual ClientAddress? ClientAddress { get; set; }
+    public virtual ICollection<ClientAddress> ClientAddresses { get; set; } = new List<ClientAddress>();
 
     [InverseProperty("Client")]
-    public virtual ClientContact? ClientContact { get; set; }
+    public virtual ICollection<ClientContact> ClientContacts { get; set; } = new List<ClientContact>();
 
     [ForeignKey("ClientTypeId")]
     [InverseProperty("Clients")]

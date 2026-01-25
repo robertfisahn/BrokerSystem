@@ -32,6 +32,6 @@ public partial class ClientContact
     public DateTime? VerifiedAt { get; set; }
 
     [ForeignKey("ClientId")]
-    [InverseProperty("ClientContact")]
+    [InverseProperty("ClientContacts")]
     public virtual Client Client { get; set; } = null!;
 }
