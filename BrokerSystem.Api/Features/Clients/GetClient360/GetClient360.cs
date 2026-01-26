@@ -1,3 +1,4 @@
+using BrokerSystem.Api.Common.Exceptions;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -117,5 +118,12 @@ public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<Get
                 }).ToList()
             })
             .FirstOrDefaultAsync(cancellationToken);
+
+        if (result == null)
+        {
+            throw new NotFoundException($"Klient o ID {request.ClientId} nie został znaleziony.");
+        }
+
+        return result;
     }
 }
