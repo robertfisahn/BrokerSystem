@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Table, Container, Title, Text, Loader, Alert, Badge, Group, Paper, TextInput, Pagination, Select, Flex } from '@mantine/core'
 import { Users, AlertCircle, Search, ArrowUpDown } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { getClients, ClientListItem, GetClientsParams } from '../api/clientsApi'
 import { ClientsStatsCards } from '../components/ClientsStatsCards'
 
 export function ClientsDashboard() {
+    const navigate = useNavigate()
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState('')
     const [sortBy, setSortBy] = useState('clientId')
@@ -112,7 +114,11 @@ export function ClientsDashboard() {
                             </Table.Thead>
                             <Table.Tbody>
                                 {data.items.map((client: ClientListItem) => (
-                                    <Table.Tr key={client.clientId}>
+                                    <Table.Tr
+                                        key={client.clientId}
+                                        onClick={() => navigate(`/clients/${client.clientId}`)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         <Table.Td>{client.clientId}</Table.Td>
                                         <Table.Td>
                                             {client.companyName

@@ -2,6 +2,7 @@
 using BrokerSystem.Api.Features.Clients.GetClientsStats;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
+using BrokerSystem.Api.Features.Clients.GetClient360;
 
 namespace BrokerSystem.Api.Features.Clients
 {
@@ -27,6 +28,14 @@ namespace BrokerSystem.Api.Features.Clients
         public async Task<IActionResult> GetClientsStats(CancellationToken ct)
         {
             var result = await mediator.Send(new GetClientsStatsQuery(), ct);
+            return Ok(result);
+        }
+
+        [HttpGet("{id}/360")]
+        public async Task<IActionResult> GetClient360(int id, CancellationToken ct)
+        {
+            var result = await mediator.Send(new GetClient360Query(id), ct);
+            if (result == null) return NotFound();
             return Ok(result);
         }
     }
