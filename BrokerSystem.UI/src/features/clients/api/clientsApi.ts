@@ -29,7 +29,20 @@ export interface GetClientsParams {
     sortDescending?: boolean;
 }
 
+export interface ClientsStats {
+    totalClients: number;
+    vipClients: number;
+    corporateClients: number;
+    activePoliciesTotal: number;
+    newClientsThisMonth: number;
+}
+
 export const getClients = async (params: GetClientsParams = {}): Promise<PaginatedResult<ClientListItem>> => {
     const response = await apiClient.get<PaginatedResult<ClientListItem>>('/clients', { params });
+    return response.data;
+};
+
+export const getClientsStats = async (): Promise<ClientsStats> => {
+    const response = await apiClient.get<ClientsStats>('/clients/stats');
     return response.data;
 };

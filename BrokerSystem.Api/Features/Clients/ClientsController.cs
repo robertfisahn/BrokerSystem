@@ -1,4 +1,5 @@
 ﻿using BrokerSystem.Api.Features.Clients.GetClients;
+using BrokerSystem.Api.Features.Clients.GetClientsStats;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
 
@@ -19,6 +20,13 @@ namespace BrokerSystem.Api.Features.Clients
         {
             var query = new GetClientsQuery(page, pageSize, search, sortBy, sortDescending);
             var result = await mediator.Send(query, ct);
+            return Ok(result);
+        }
+
+        [HttpGet("stats")]
+        public async Task<IActionResult> GetClientsStats(CancellationToken ct)
+        {
+            var result = await mediator.Send(new GetClientsStatsQuery(), ct);
             return Ok(result);
         }
     }

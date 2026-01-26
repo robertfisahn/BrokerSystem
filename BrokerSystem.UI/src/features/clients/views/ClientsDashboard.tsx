@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Table, Container, Title, Text, Loader, Alert, Badge, Group, Paper, TextInput, Pagination, Select, Flex } from '@mantine/core'
 import { Users, AlertCircle, Search, ArrowUpDown } from 'lucide-react'
 import { getClients, ClientListItem, GetClientsParams } from '../api/clientsApi'
+import { ClientsStatsCards } from '../components/ClientsStatsCards'
 
 export function ClientsDashboard() {
     const [page, setPage] = useState(1)
@@ -26,7 +27,7 @@ export function ClientsDashboard() {
 
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearch(event.target.value)
-        setPage(1) // Reset to first page on search
+        setPage(1)
     }
 
     const handleSortChange = (value: string | null) => {
@@ -38,37 +39,15 @@ export function ClientsDashboard() {
         }
     }
 
-    if (isLoading) {
-        return (
-            <Container size="xl" py="xl">
-                <Group justify="center" py="xl">
-                    <Loader size="lg" />
-                    <Text>Ładowanie klientów...</Text>
-                </Group>
-            </Container>
-        )
-    }
-
-    if (error) {
-        return (
-            <Container size="xl" py="xl">
-                <Alert icon={<AlertCircle size={16} />} title="Błąd" color="red">
-                    Nie udało się pobrać listy klientów.
-                </Alert>
-            </Container>
-        )
-    }
-
     return (
         <Container size="xl" py="xl">
             <Group mb="lg">
                 <Users size={32} />
-                <Title order={1}>Dashboard Klientów</Title>
+                <Title order={1}>Klienci</Title>
             </Group>
 
-            <Text c="dimmed" mb="md">
-                Łączna liczba klientów: {data?.totalCount ?? 0}
-            </Text>
+            {/* Stats Cards */}
+            <ClientsStatsCards />
 
             {/* Search and Sort Controls */}
             <Flex gap="md" mb="lg" wrap="wrap">
@@ -98,54 +77,77 @@ export function ClientsDashboard() {
                 />
             </Flex>
 
-            <Paper shadow="sm" radius="md" withBorder>
-                <Table striped highlightOnHover>
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th>ID</Table.Th>
-                            <Table.Th>Imię i Nazwisko / Firma</Table.Th>
-                            <Table.Th>Typ</Table.Th>
-                            <Table.Th>Kontakt</Table.Th>
-                            <Table.Th>Miasto</Table.Th>
-                            <Table.Th>Aktywne Polisy</Table.Th>
-                        </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                        {data?.items.map((client: ClientListItem) => (
-                            <Table.Tr key={client.clientId}>
-                                <Table.Td>{client.clientId}</Table.Td>
-                                <Table.Td>
-                                    {client.companyName
-                                        ? client.companyName
-                                        : `${client.firstName ?? ''} ${client.lastName ?? ''}`}
-                                </Table.Td>
-                                <Table.Td>
-                                    <Badge color={client.clientType === 'VIP' ? 'yellow' : 'blue'} variant="light">
-                                        {client.clientType}
-                                    </Badge>
-                                </Table.Td>
-                                <Table.Td>{client.primaryContact ?? '-'}</Table.Td>
-                                <Table.Td>{client.city ?? '-'}</Table.Td>
-                                <Table.Td>
-                                    <Badge color={client.activePoliciesCount > 0 ? 'green' : 'gray'}>
-                                        {client.activePoliciesCount}
-                                    </Badge>
-                                </Table.Td>
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
-            </Paper>
-
-            {/* Pagination */}
-            {data && data.totalPages > 1 && (
-                <Group justify="center" mt="lg">
-                    <Pagination
-                        total={data.totalPages}
-                        value={page}
-                        onChange={setPage}
-                    />
+            {/* Loading State */}
+            {isLoading && (
+                <Group justify="center" py="xl">
+                    <Loader size="lg" />
+                    <Text>Ładowanie klientów...</Text>
                 </Group>
+            )}
+
+            {/* Error State */}
+            {error && (
+                <Alert icon={<AlertCircle size={16} />} title="Błąd" color="red">
+                    Nie udało się pobrać listy klientów.
+                </Alert>
+            )}
+
+            {/* Table */}
+            {data && (
+                <>
+                    <Text c="dimmed" size="sm" mb="sm">
+                        Wyświetlono {data.items.length} z {data.totalCount} klientów
+                    </Text>
+                    <Paper shadow="sm" radius="md" withBorder>
+                        <Table striped highlightOnHover>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>ID</Table.Th>
+                                    <Table.Th>Imię i Nazwisko / Firma</Table.Th>
+                                    <Table.Th>Typ</Table.Th>
+                                    <Table.Th>Kontakt</Table.Th>
+                                    <Table.Th>Miasto</Table.Th>
+                                    <Table.Th>Aktywne Polisy</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {data.items.map((client: ClientListItem) => (
+                                    <Table.Tr key={client.clientId}>
+                                        <Table.Td>{client.clientId}</Table.Td>
+                                        <Table.Td>
+                                            {client.companyName
+                                                ? client.companyName
+                                                : `${client.firstName ?? ''} ${client.lastName ?? ''}`}
+                                        </Table.Td>
+                                        <Table.Td>
+                                            <Badge color={client.clientType === 'VIP' ? 'yellow' : 'blue'} variant="light">
+                                                {client.clientType}
+                                            </Badge>
+                                        </Table.Td>
+                                        <Table.Td>{client.primaryContact ?? '-'}</Table.Td>
+                                        <Table.Td>{client.city ?? '-'}</Table.Td>
+                                        <Table.Td>
+                                            <Badge color={client.activePoliciesCount > 0 ? 'green' : 'gray'}>
+                                                {client.activePoliciesCount}
+                                            </Badge>
+                                        </Table.Td>
+                                    </Table.Tr>
+                                ))}
+                            </Table.Tbody>
+                        </Table>
+                    </Paper>
+
+                    {/* Pagination */}
+                    {data.totalPages > 1 && (
+                        <Group justify="center" mt="lg">
+                            <Pagination
+                                total={data.totalPages}
+                                value={page}
+                                onChange={setPage}
+                            />
+                        </Group>
+                    )}
+                </>
             )}
         </Container>
     )
