@@ -1,3 +1,4 @@
+using BrokerSystem.Api.Common.Middleware;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
-
+builder.Services.AddScoped<ErrorHandlingMiddleware>();
 // MEDIATR
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 // DB CONTEXT
@@ -27,7 +28,7 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
-
+app.UseMiddleware<ErrorHandlingMiddleware>();
 // === SEEDING - URUCHAMIAJ TYLKO RAZ! ===
 // Odkomentuj poni¿szy blok aby wykonaæ seedowanie
 

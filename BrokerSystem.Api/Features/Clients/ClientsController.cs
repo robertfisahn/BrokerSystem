@@ -35,7 +35,6 @@ namespace BrokerSystem.Api.Features.Clients
         public async Task<IActionResult> GetClient360(int id, CancellationToken ct)
         {
             var result = await mediator.Send(new GetClient360Query(id), ct);
-            if (result == null) return NotFound();
             return Ok(result);
         }
     }
