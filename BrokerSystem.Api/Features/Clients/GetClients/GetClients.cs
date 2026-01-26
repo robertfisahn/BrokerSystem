@@ -1,10 +1,17 @@
-﻿using BrokerSystem.Api.Infrastructure.Persistence.Context;
+﻿using BrokerSystem.Api.Common.Models;
+using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace BrokerSystem.Api.Features.Clients.GetClients;
 
-public record GetClientsQuery() : IRequest<List<GetClientsDto>>;
+public record GetClientsQuery(
+    int Page = 1,
+    int PageSize = 20,
+    string? Search = null,
+    string SortBy = "clientId",
+    bool SortDescending = false
+) : IRequest<PaginatedResult<GetClientsDto>>;
 
 public record GetClientsDto
 {
@@ -18,11 +25,50 @@ public record GetClientsDto
     public int ActivePoliciesCount { get; init; }
 }
 
-public class GetClientsHandler(BrokerSystemDbContext db) : IRequestHandler<GetClientsQuery, List<GetClientsDto>>
+public class GetClientsHandler(BrokerSystemDbContext db) : IRequestHandler<GetClientsQuery, PaginatedResult<GetClientsDto>>
 {
-    public async Task<List<GetClientsDto>> Handle(GetClientsQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<GetClientsDto>> Handle(GetClientsQuery request, CancellationToken cancellationToken)
     {
-        return await db.Clients
+        var query = db.Clients.AsQueryable();
+
+        // Search filter
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var searchLower = request.Search.ToLower();
+            query = query.Where(c =>
+                (c.FirstName != null && c.FirstName.ToLower().Contains(searchLower)) ||
+                (c.LastName != null && c.LastName.ToLower().Contains(searchLower)) ||
+                (c.CompanyName != null && c.CompanyName.ToLower().Contains(searchLower))
+            );
+        }
+
+        // Get total count before pagination
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        // Sorting
+        query = request.SortBy.ToLower() switch
+        {
+            "firstname" => request.SortDescending 
+                ? query.OrderByDescending(c => c.FirstName) 
+                : query.OrderBy(c => c.FirstName),
+            "lastname" => request.SortDescending 
+                ? query.OrderByDescending(c => c.LastName) 
+                : query.OrderBy(c => c.LastName),
+            "companyname" => request.SortDescending 
+                ? query.OrderByDescending(c => c.CompanyName) 
+                : query.OrderBy(c => c.CompanyName),
+            "clienttype" => request.SortDescending 
+                ? query.OrderByDescending(c => c.ClientType.TypeName) 
+                : query.OrderBy(c => c.ClientType.TypeName),
+            _ => request.SortDescending 
+                ? query.OrderByDescending(c => c.ClientId) 
+                : query.OrderBy(c => c.ClientId)
+        };
+
+        // Pagination
+        var items = await query
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
             .Select(c => new GetClientsDto
             {
                 ClientId = c.ClientId,
@@ -41,5 +87,7 @@ public class GetClientsHandler(BrokerSystemDbContext db) : IRequestHandler<GetCl
                 ActivePoliciesCount = c.Policies.Count(p => p.Status.IsActivePolicy)
             })
             .ToListAsync(cancellationToken);
+
+        return new PaginatedResult<GetClientsDto>(items, totalCount, request.Page, request.PageSize);
     }
 }

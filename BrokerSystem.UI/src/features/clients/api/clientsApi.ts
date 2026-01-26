@@ -11,7 +11,25 @@ export interface ClientListItem {
     activePoliciesCount: number;
 }
 
-export const getClients = async (): Promise<ClientListItem[]> => {
-    const response = await apiClient.get<ClientListItem[]>('/clients');
+export interface PaginatedResult<T> {
+    items: T[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+}
+
+export interface GetClientsParams {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    sortBy?: string;
+    sortDescending?: boolean;
+}
+
+export const getClients = async (params: GetClientsParams = {}): Promise<PaginatedResult<ClientListItem>> => {
+    const response = await apiClient.get<PaginatedResult<ClientListItem>>('/clients', { params });
     return response.data;
 };

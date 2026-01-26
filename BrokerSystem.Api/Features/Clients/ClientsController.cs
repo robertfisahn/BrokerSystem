@@ -9,9 +9,16 @@ namespace BrokerSystem.Api.Features.Clients
     public class ClientsController(IMediator mediator) : ControllerBase
     {
         [HttpGet]
-        public async Task<IActionResult> GetClients(CancellationToken ct)
+        public async Task<IActionResult> GetClients(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null,
+            [FromQuery] string sortBy = "clientId",
+            [FromQuery] bool sortDescending = false,
+            CancellationToken ct = default)
         {
-            var result = await mediator.Send(new GetClientsQuery(), ct);
+            var query = new GetClientsQuery(page, pageSize, search, sortBy, sortDescending);
+            var result = await mediator.Send(query, ct);
             return Ok(result);
         }
     }
