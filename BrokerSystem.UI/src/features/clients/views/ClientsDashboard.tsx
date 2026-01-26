@@ -1,13 +1,42 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Table, Container, Title, Text, Loader, Alert, Badge, Group, Paper } from '@mantine/core'
-import { Users, AlertCircle } from 'lucide-react'
-import { getClients, ClientListItem } from '../api/clientsApi'
+import { Table, Container, Title, Text, Loader, Alert, Badge, Group, Paper, TextInput, Pagination, Select, Flex } from '@mantine/core'
+import { Users, AlertCircle, Search, ArrowUpDown } from 'lucide-react'
+import { getClients, ClientListItem, GetClientsParams } from '../api/clientsApi'
 
 export function ClientsDashboard() {
-    const { data: clients, isLoading, error } = useQuery({
-        queryKey: ['clients'],
-        queryFn: getClients,
+    const [page, setPage] = useState(1)
+    const [search, setSearch] = useState('')
+    const [sortBy, setSortBy] = useState('clientId')
+    const [sortDescending, setSortDescending] = useState(false)
+    const pageSize = 20
+
+    const params: GetClientsParams = {
+        page,
+        pageSize,
+        search: search || undefined,
+        sortBy,
+        sortDescending,
+    }
+
+    const { data, isLoading, error } = useQuery({
+        queryKey: ['clients', params],
+        queryFn: () => getClients(params),
     })
+
+    const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setSearch(event.target.value)
+        setPage(1) // Reset to first page on search
+    }
+
+    const handleSortChange = (value: string | null) => {
+        if (value) {
+            const [field, order] = value.split('-')
+            setSortBy(field)
+            setSortDescending(order === 'desc')
+            setPage(1)
+        }
+    }
 
     if (isLoading) {
         return (
@@ -37,9 +66,37 @@ export function ClientsDashboard() {
                 <Title order={1}>Dashboard Klientów</Title>
             </Group>
 
-            <Text c="dimmed" mb="xl">
-                Łączna liczba klientów: {clients?.length ?? 0}
+            <Text c="dimmed" mb="md">
+                Łączna liczba klientów: {data?.totalCount ?? 0}
             </Text>
+
+            {/* Search and Sort Controls */}
+            <Flex gap="md" mb="lg" wrap="wrap">
+                <TextInput
+                    placeholder="Szukaj po imieniu, nazwisku lub firmie..."
+                    leftSection={<Search size={16} />}
+                    value={search}
+                    onChange={handleSearchChange}
+                    style={{ flex: 1, minWidth: 250 }}
+                />
+                <Select
+                    leftSection={<ArrowUpDown size={16} />}
+                    placeholder="Sortuj..."
+                    value={`${sortBy}-${sortDescending ? 'desc' : 'asc'}`}
+                    onChange={handleSortChange}
+                    data={[
+                        { value: 'clientId-asc', label: 'ID (rosnąco)' },
+                        { value: 'clientId-desc', label: 'ID (malejąco)' },
+                        { value: 'firstName-asc', label: 'Imię (A-Z)' },
+                        { value: 'firstName-desc', label: 'Imię (Z-A)' },
+                        { value: 'lastName-asc', label: 'Nazwisko (A-Z)' },
+                        { value: 'lastName-desc', label: 'Nazwisko (Z-A)' },
+                        { value: 'companyName-asc', label: 'Firma (A-Z)' },
+                        { value: 'companyName-desc', label: 'Firma (Z-A)' },
+                    ]}
+                    style={{ width: 200 }}
+                />
+            </Flex>
 
             <Paper shadow="sm" radius="md" withBorder>
                 <Table striped highlightOnHover>
@@ -54,7 +111,7 @@ export function ClientsDashboard() {
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
-                        {clients?.map((client: ClientListItem) => (
+                        {data?.items.map((client: ClientListItem) => (
                             <Table.Tr key={client.clientId}>
                                 <Table.Td>{client.clientId}</Table.Td>
                                 <Table.Td>
@@ -79,6 +136,17 @@ export function ClientsDashboard() {
                     </Table.Tbody>
                 </Table>
             </Paper>
+
+            {/* Pagination */}
+            {data && data.totalPages > 1 && (
+                <Group justify="center" mt="lg">
+                    <Pagination
+                        total={data.totalPages}
+                        value={page}
+                        onChange={setPage}
+                    />
+                </Group>
+            )}
         </Container>
     )
 }

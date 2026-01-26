@@ -21,7 +21,7 @@ builder.Services.AddDbContext<BrokerSystemDbContext>(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowedBrokerSystemUI",
-        builder => builder.WithOrigins("http://127.0.0.1:4200")
+        builder => builder.WithOrigins("http://localhost:5173")
                           .AllowAnyHeader()
                           .AllowAnyMethod());
 });
