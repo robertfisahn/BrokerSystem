@@ -29,17 +29,20 @@ public class GetClientsHandler(BrokerSystemDbContext db) : IRequestHandler<GetCl
 {
     public async Task<PaginatedResult<GetClientsDto>> Handle(GetClientsQuery request, CancellationToken cancellationToken)
     {
-        var query = db.Clients.AsQueryable();
+        var query = db.Clients.AsNoTracking().AsQueryable();
 
-        // Search filter
+        // Search filter (Multi-word support)
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var searchLower = request.Search.ToLower();
-            query = query.Where(c =>
-                (c.FirstName != null && c.FirstName.ToLower().Contains(searchLower)) ||
-                (c.LastName != null && c.LastName.ToLower().Contains(searchLower)) ||
-                (c.CompanyName != null && c.CompanyName.ToLower().Contains(searchLower))
-            );
+            var searchWords = request.Search.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var word in searchWords)
+            {
+                query = query.Where(c =>
+                    (c.FirstName != null && c.FirstName.ToLower().Contains(word)) ||
+                    (c.LastName != null && c.LastName.ToLower().Contains(word)) ||
+                    (c.CompanyName != null && c.CompanyName.ToLower().Contains(word))
+                );
+            }
         }
 
         // Get total count before pagination
