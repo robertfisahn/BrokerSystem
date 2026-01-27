@@ -3,13 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BrokerSystem.Api.Infrastructure.Persistence.Context;
 
-public partial class BrokerSystemDbContext : DbContext
+public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContext> options) : DbContext(options)
 {
-    public BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContext> options)
-        : base(options)
-    {
-    }
-
     public virtual DbSet<Agent> Agents { get; set; }
 
     public virtual DbSet<AgentPerformance> AgentPerformances { get; set; }
