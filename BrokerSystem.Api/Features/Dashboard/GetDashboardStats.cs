@@ -1,4 +1,5 @@
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
+using BrokerSystem.Api.Common.Caching;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,20 +30,25 @@ public record DashboardKpis(
     decimal TotalPremiumVolume
 );
 
-public class GetDashboardStatsHandler(BrokerSystemDbContext db) : IRequestHandler<GetDashboardStatsQuery, DashboardStatsResponse>
+public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService cache) : IRequestHandler<GetDashboardStatsQuery, DashboardStatsResponse>
 {
+    private const string CacheKey = "DashboardStats";
+
     public async Task<DashboardStatsResponse> Handle(GetDashboardStatsQuery request, CancellationToken ct)
     {
-        using var connection = db.Database.GetDbConnection();
+        return await cache.GetOrCreateAsync(CacheKey, async () =>
+        {
+            Console.WriteLine($"[DB HIT] {DateTime.Now:HH:mm:ss}");
+            using var connection = db.Database.GetDbConnection();
+            using var multi = await connection.QueryMultipleAsync("usp_GetDashboardStats", commandType: CommandType.StoredProcedure);
 
-        using var multi = await connection.QueryMultipleAsync("usp_GetDashboardStats", commandType: CommandType.StoredProcedure);
+            var monthlySales = (await multi.ReadAsync<MonthlySales>()).ToList();
+            var clientTypes = (await multi.ReadAsync<ClientTypeDistribution>()).ToList();
+            var policyStatuses = (await multi.ReadAsync<PolicyStatusDistribution>()).ToList();
+            var kpis = await multi.ReadSingleAsync<DashboardKpis>();
 
-        var monthlySales = (await multi.ReadAsync<MonthlySales>()).ToList();
-        var clientTypes = (await multi.ReadAsync<ClientTypeDistribution>()).ToList();
-        var policyStatuses = (await multi.ReadAsync<PolicyStatusDistribution>()).ToList();
-        var kpis = await multi.ReadSingleAsync<DashboardKpis>();
-
-        return new DashboardStatsResponse(monthlySales, clientTypes, policyStatuses, kpis);
+            return new DashboardStatsResponse(monthlySales, clientTypes, policyStatuses, kpis);
+        }, TimeSpan.FromMinutes(10));
     }
 }
 

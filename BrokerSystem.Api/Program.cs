@@ -1,3 +1,4 @@
+using BrokerSystem.Api.Common.Caching;
 using BrokerSystem.Api.Common.Middleware;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 builder.Services.AddScoped<ErrorHandlingMiddleware>();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 // MEDIATR
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 // DB CONTEXT
@@ -29,8 +32,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-// === SEEDING - URUCHAMIAJ TYLKO RAZ! ===
-// Odkomentuj poni¿szy blok aby wykonaæ seedowanie
 
 //using (var scope = app.Services.CreateScope())
 //{
@@ -42,14 +43,13 @@ app.UseMiddleware<ErrorHandlingMiddleware>();
 //    {
 //        var seeder = new DatabaseSeeder(context, logger);
 
-//        //UWAGA: resetDatabase = true WYCZYŒCI CA£¥ BAZÊ!
 //        await seeder.SeedAllAsync(resetDatabase: true);
 
-//        logger.LogInformation("Seedowanie zakoñczone!");
+//        logger.LogInformation("Seedowanie zakonczone!");
 //    }
 //    catch (Exception ex)
 //    {
-//        logger.LogError(ex, "B³¹d podczas seedowania!");
+//        logger.LogError(ex, "Blad podczas seedowania!");
 //    }
 //}
 
