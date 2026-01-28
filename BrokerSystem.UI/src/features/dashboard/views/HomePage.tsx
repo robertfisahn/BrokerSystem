@@ -7,7 +7,8 @@ import { DashboardCharts } from '../components/DashboardCharts'
 export function HomePage() {
     const { data, isLoading, error } = useQuery({
         queryKey: ['dashboardStats'],
-        queryFn: getDashboardStats
+        queryFn: getDashboardStats,
+        staleTime: 5 * 60 * 1000 // 5 minutes
     })
 
     if (isLoading) {
