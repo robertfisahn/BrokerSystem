@@ -31,3 +31,36 @@ export const getPolicies = async (params: GetPoliciesParams): Promise<PaginatedR
     return response.data;
 };
 
+export interface CreatePolicyData {
+    policyNumber: string;
+    clientId: number;
+    policyTypeId: number;
+    agentId: number;
+    premiumAmount: number;
+    sumInsured: number;
+    startDate: string;
+    endDate: string;
+    paymentFrequency: string;
+}
+
+export interface LookupDto {
+    id: number;
+    name: string;
+}
+
+export interface PolicyLookups {
+    clients: LookupDto[];
+    policyTypes: LookupDto[];
+    agents: LookupDto[];
+}
+
+export const createPolicy = async (data: CreatePolicyData): Promise<number> => {
+    const response = await apiClient.post<number>('/policies', data);
+    return response.data;
+};
+
+export const getPolicyLookups = async (): Promise<PolicyLookups> => {
+    const response = await apiClient.get<PolicyLookups>('/policies/lookups');
+    return response.data;
+};
+

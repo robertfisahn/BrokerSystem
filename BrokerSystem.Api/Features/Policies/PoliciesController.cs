@@ -1,4 +1,6 @@
+using BrokerSystem.Api.Features.Policies.CreatePolicy;
 using BrokerSystem.Api.Features.Policies.GetPolicies;
+using BrokerSystem.Api.Features.Policies.GetPolicyLookups;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,5 +15,19 @@ public class PoliciesController(IMediator mediator) : ControllerBase
     {
         var result = await mediator.Send(query);
         return Ok(result);
+    }
+
+    [HttpGet("lookups")]
+    public async Task<IActionResult> GetLookups()
+    {
+        var result = await mediator.Send(new GetPolicyLookupsQuery());
+        return Ok(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreatePolicyCommand command)
+    {
+        var id = await mediator.Send(command);
+        return Ok(id);
     }
 }
