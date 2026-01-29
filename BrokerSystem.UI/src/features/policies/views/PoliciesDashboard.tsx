@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { getPolicies, GetPoliciesParams } from '../api/policiesApi'
 import { useDisclosure } from '@mantine/hooks'
+import CreatePolicyModal from '../components/CreatePolicyModal';
 
 export function PoliciesDashboard() {
     const [opened, { open, close }] = useDisclosure(false);
@@ -135,12 +136,14 @@ export function PoliciesDashboard() {
 
                 <Group justify="center" mt="xl">
                     <Pagination
-                        total={data ? Math.ceil(data.totalCount / pageSize) : 0}
+                        total={Math.ceil((data?.totalCount || 0) / pageSize)}
                         value={page}
                         onChange={setPage}
+                        mt="md"
                     />
                 </Group>
             </Card>
+            <CreatePolicyModal opened={opened} onClose={close} />
         </Container>
     );
 }
