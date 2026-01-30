@@ -39,8 +39,8 @@ public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetP
         {
             query = query.Where(p => 
                 p.PolicyNumber.Contains(request.SearchTerm) ||
-                p.Client.LastName.Contains(request.SearchTerm) ||
-                p.Client.FirstName.Contains(request.SearchTerm));
+                (p.Client.LastName != null && p.Client.LastName.Contains(request.SearchTerm)) ||
+                (p.Client.FirstName != null && p.Client.FirstName.Contains(request.SearchTerm)));
         }
 
         var totalCount = await query.CountAsync(ct);

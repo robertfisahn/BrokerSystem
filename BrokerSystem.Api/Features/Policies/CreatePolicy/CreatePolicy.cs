@@ -1,3 +1,4 @@
+using BrokerSystem.Api.Common.Exceptions;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Infrastructure.Persistence.Entities;
 using FluentValidation;
@@ -39,7 +40,7 @@ public class CreatePolicyHandler(BrokerSystemDbContext db) : IRequestHandler<Cre
     {
         if (await db.Policies.AnyAsync(p => p.PolicyNumber == request.PolicyNumber, ct))
         {
-            throw new ValidationException("Polisa o takim numerze już istnieje.");
+            throw new BadRequestException("Polisa o takim numerze już istnieje.");
         }
 
         var activeStatus = await db.PolicyStatuses

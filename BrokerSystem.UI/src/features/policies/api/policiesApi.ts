@@ -64,3 +64,25 @@ export const getPolicyLookups = async (): Promise<PolicyLookups> => {
     return response.data;
 };
 
+export const exportPolicy = async (id: number): Promise<void> => {
+    const response = await apiClient.get(`/policies/${id}/export`, {
+        responseType: 'blob',
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Polisa_${id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+};
+
+export const getPolicyPdfUrl = async (id: number): Promise<string> => {
+    const response = await apiClient.get(`/policies/${id}/export`, {
+        responseType: 'blob',
+    });
+    return window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+};
+

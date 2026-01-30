@@ -2,12 +2,15 @@ import { Container, Title, Text, Card, Table, Pagination, Group, TextInput, Badg
 import { FileText, Search, MoreVertical, Download, Eye, Plus } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { getPolicies, GetPoliciesParams } from '../api/policiesApi'
+import { getPolicies, GetPoliciesParams, exportPolicy } from '../api/policiesApi'
 import { useDisclosure } from '@mantine/hooks'
 import CreatePolicyModal from '../components/CreatePolicyModal';
+import { PolicyPreviewModal } from '../components/PolicyPreviewModal';
 
 export function PoliciesDashboard() {
     const [opened, { open, close }] = useDisclosure(false);
+    const [previewOpened, { open: openPreview, close: closePreview }] = useDisclosure(false);
+    const [selectedPolicy, setSelectedPolicy] = useState<{ id: number, number: string } | null>(null);
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
     const pageSize = 10;
@@ -119,11 +122,21 @@ export function PoliciesDashboard() {
 
                                             <Menu.Dropdown>
                                                 <Menu.Label>Zarządzanie</Menu.Label>
-                                                <Menu.Item leftSection={<Eye size={14} />}>
-                                                    Szczegóły
+                                                <Menu.Item
+                                                    leftSection={<Eye size={14} />}
+                                                    onClick={() => {
+                                                        setSelectedPolicy({ id: policy.policyId, number: policy.policyNumber });
+                                                        openPreview();
+                                                    }}
+                                                >
+                                                    Szczegóły / Podgląd
                                                 </Menu.Item>
-                                                <Menu.Item leftSection={<Download size={14} />} color="blue">
-                                                    Generuj Umowę (PDF)
+                                                <Menu.Item
+                                                    leftSection={<Download size={14} />}
+                                                    color="blue"
+                                                    onClick={() => exportPolicy(policy.policyId)}
+                                                >
+                                                    Pobierz (PDF)
                                                 </Menu.Item>
                                             </Menu.Dropdown>
                                         </Menu>
@@ -144,6 +157,12 @@ export function PoliciesDashboard() {
                 </Group>
             </Card>
             <CreatePolicyModal opened={opened} onClose={close} />
+            <PolicyPreviewModal
+                opened={previewOpened}
+                onClose={closePreview}
+                policyId={selectedPolicy?.id || null}
+                policyNumber={selectedPolicy?.number}
+            />
         </Container>
     );
 }
