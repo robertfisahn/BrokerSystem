@@ -2,6 +2,10 @@ using BrokerSystem.Api.Common.Caching;
 using BrokerSystem.Api.Common.Middleware;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Infrastructure;
+
+// QuestPDF License
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
