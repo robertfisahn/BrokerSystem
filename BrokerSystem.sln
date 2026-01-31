@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrokerSystem.Api", "BrokerSystem.Api\BrokerSystem.Api.csproj", "{BA212345-6789-4ABC-DEF1-23456789ABCD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BrokerSystem.Tests.Performance", "tests\BrokerSystem.Tests.Performance\BrokerSystem.Tests.Performance.csproj", "{FB96E25C-777C-4713-BC4B-C1C9F57A882C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BA212345-6789-4ABC-DEF1-23456789ABCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA212345-6789-4ABC-DEF1-23456789ABCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA212345-6789-4ABC-DEF1-23456789ABCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA212345-6789-4ABC-DEF1-23456789ABCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB96E25C-777C-4713-BC4B-C1C9F57A882C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB96E25C-777C-4713-BC4B-C1C9F57A882C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB96E25C-777C-4713-BC4B-C1C9F57A882C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB96E25C-777C-4713-BC4B-C1C9F57A882C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7CAFB386-B900-45AC-8B36-85D463C5443B}
+	EndGlobalSection
+EndGlobal
