@@ -1,8 +1,13 @@
 using BrokerSystem.Api.Common.Caching;
 using BrokerSystem.Api.Common.Middleware;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
+using BrokerSystem.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
+using Dapper;
+
+// Register Dapper Type Handlers (Must be early)
+SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
 
 // QuestPDF License
 QuestPDF.Settings.License = LicenseType.Community;
@@ -36,26 +41,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var services = scope.ServiceProvider;
-//    var context = services.GetRequiredService<BrokerSystemDbContext>();
-//    var logger = services.GetRequiredService<ILogger<DatabaseSeeder>>();
-
-//    try
-//    {
-//        var seeder = new DatabaseSeeder(context, logger);
-
-//        await seeder.SeedAllAsync(resetDatabase: true);
-
-//        logger.LogInformation("Seedowanie zakonczone!");
-//    }
-//    catch (Exception ex)
-//    {
-//        logger.LogError(ex, "Blad podczas seedowania!");
-//    }
-//}
 
 // Configure the HTTP request pipeline.
 app.MapControllers();

@@ -1,14 +1,14 @@
 ﻿using BrokerSystem.Api.Infrastructure.Persistence.Context;
-using BrokerSystem.Api.Infrastructure.Persistence.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Dapper;
 
 namespace BrokerSystem.Api.Features.Policies.GetPolicies;
 
 public record GetPoliciesQuery(
     int Page = 1,
     int PageSize = 20,
-    string? SearchTerm = null,
+    string? Search = null,
     string? SortBy = null,
     bool SortDescending = false) : IRequest<PagedPoliciesResponse>;
 
@@ -24,57 +24,75 @@ public record PolicyDto(
     string ClientName,
     string PolicyType,
     decimal TotalPremium,
-    DateTime StartDate,
-    DateTime EndDate,
+    DateOnly StartDate,
+    DateOnly EndDate,
     string Status);
 
 public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetPoliciesQuery, PagedPoliciesResponse>
 {
     public async Task<PagedPoliciesResponse> Handle(GetPoliciesQuery request, CancellationToken ct)
     {
-        var query = db.Policies.AsNoTracking();
+        using var connection = db.Database.GetDbConnection();
 
-        // Filtrowanie
-        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        // 1. Dynamic whereClause (Build statement based on Search)
+        var whereClause = "WHERE 1=1";
+        var parameters = new DynamicParameters();
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            query = query.Where(p => 
-                p.PolicyNumber.Contains(request.SearchTerm) ||
-                (p.Client.LastName != null && p.Client.LastName.Contains(request.SearchTerm)) ||
-                (p.Client.FirstName != null && p.Client.FirstName.Contains(request.SearchTerm)));
+            var searchWords = request.Search.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < searchWords.Length; i++)
+            {
+                var pName = $"@p{i}";
+                whereClause += $" AND (p.policy_number LIKE {pName} OR c.first_name LIKE {pName} OR c.last_name LIKE {pName})";
+                parameters.Add(pName, $"%{searchWords[i]}%");
+            }
         }
 
-        var totalCount = await query.CountAsync(ct);
+        // 2. Count Query
+        var countSql = $@"
+            SELECT COUNT(*) 
+            FROM policies p
+            INNER JOIN clients c ON p.client_id = c.client_id
+            {whereClause}";
+            
+        var totalCount = await connection.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Sortowanie i Pagynacja
-        var itemsQuery = ApplySorting(query, request.SortBy, request.SortDescending);
+        // 3. Sorting logic
+        var orderBy = request.SortBy?.ToLower() switch
+        {
+            "policynumber" => "p.policy_number",
+            "clientname" => "c.last_name",
+            "totalpremium" => "p.premium_amount",
+            "status" => "ps.status_name",
+            _ => "p.created_at"
+        };
+        orderBy += request.SortDescending ? " DESC" : " ASC";
 
-        var items = await itemsQuery
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .Select(p => new PolicyDto(
-                p.PolicyId,
-                p.PolicyNumber,
-                p.Client.FirstName + " " + p.Client.LastName,
-                p.PolicyType.TypeName,
-                p.PremiumAmount,
-                p.StartDate.ToDateTime(TimeOnly.MinValue),
-                p.EndDate.ToDateTime(TimeOnly.MinValue),
-                p.Status.StatusName
-            ))
-            .ToListAsync(ct);
+        // 4. Data Query (Dapper Optimized)
+        var sql = $@"
+            SELECT 
+                p.policy_id AS PolicyId,
+                p.policy_number AS PolicyNumber,
+                c.first_name + ' ' + c.last_name AS ClientName,
+                pt.type_name AS PolicyType,
+                p.premium_amount AS TotalPremium,
+                p.start_date AS StartDate,
+                p.end_date AS EndDate,
+                ps.status_name AS Status
+            FROM policies p
+            INNER JOIN clients c ON p.client_id = c.client_id
+            INNER JOIN policy_types pt ON p.policy_type_id = pt.policy_type_id
+            INNER JOIN policy_statuses ps ON p.status_id = ps.status_id
+            {whereClause}
+            ORDER BY {orderBy}
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+        parameters.Add("@Offset", (request.Page - 1) * request.PageSize);
+        parameters.Add("@PageSize", request.PageSize);
+
+        var items = (await connection.QueryAsync<PolicyDto>(sql, parameters)).ToList();
 
         return new PagedPoliciesResponse(items, totalCount, request.Page, request.PageSize);
-    }
-
-    private static IQueryable<Policy> ApplySorting(IQueryable<Policy> query, string? sortBy, bool descending)
-    {
-        return sortBy?.ToLower() switch
-        {
-            "policynumber" => descending ? query.OrderByDescending(p => p.PolicyNumber) : query.OrderBy(p => p.PolicyNumber),
-            "clientname" => descending ? query.OrderByDescending(p => p.Client.LastName) : query.OrderBy(p => p.Client.LastName),
-            "totalpremium" => descending ? query.OrderByDescending(p => p.PremiumAmount) : query.OrderBy(p => p.PremiumAmount),
-            "status" => descending ? query.OrderByDescending(p => p.Status.StatusName) : query.OrderBy(p => p.Status.StatusName),
-            _ => query.OrderByDescending(p => p.CreatedAt)
-        };
     }
 }
