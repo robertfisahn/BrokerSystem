@@ -35,9 +35,9 @@ public class GetClientsBenchmarks
     }
 
     [Benchmark(Baseline = true)]
-    public async Task<List<GetClientsDto>> Listing_EF_Current()
+    public async Task<List<GetClientsDto>> GetClients_EF_Current()
     {
-        // Aktualna implementacja z GetClients.cs
+        // 1. Aktualna implementacja z GetClients.cs
         // AsNoTracking() jest tu opcjonalne, ponieważ rzutowanie na DTO 
         // automatycznie wyłącza śledzenie zmian (Tracking). Pozostawiono dla jawności.
         return await _db.Clients
@@ -64,9 +64,9 @@ public class GetClientsBenchmarks
     }
 
     [Benchmark]
-    public async Task<List<GetClientsDto>> Listing_Dapper_RawSql()
+    public async Task<List<GetClientsDto>> GetClients_Dapper_RawSql()
     {
-        // Sposób 2: Surowy SQL (Dapper) - pominięcie translatora LINQ
+        // 2. Surowy SQL (Dapper) - pominięcie translatora LINQ
         using var connection = new SqlConnection(_connectionString);
         const string sql = @"
             SELECT TOP 20
@@ -86,9 +86,9 @@ public class GetClientsBenchmarks
     }
 
     [Benchmark]
-    public async Task<List<GetClientsDto>> Listing_EF_Heavy_Includes()
+    public async Task<List<GetClientsDto>> GetClients_EF_Heavy_Includes()
     {
-        // Sposób 3: Pobranie pełnych encji (Include) i mapowanie w pamięci RAM.
+        // 3. Pobranie pełnych encji (Include) i mapowanie w pamięci RAM.
         var items = await _db.Clients
             .AsNoTracking()
             .Include(c => c.ClientType)
@@ -112,9 +112,9 @@ public class GetClientsBenchmarks
         }).ToList();
     }
     [Benchmark]
-    public async Task<List<GetClientsDto>> Listing_EF_CompiledQuery()
+    public async Task<List<GetClientsDto>> GetClients_EF_CompiledQuery()
     {
-        // Sposób 4: Compiled Query - cache'owanie planu wykonania zapytania w EF Core.
+        // 4. Compiled Query - cache'owanie planu wykonania zapytania w EF Core.
         // Uniknięcie ponownej analizy drzewa wyrażeń LINQ
         var results = new List<GetClientsDto>();
         await foreach (var client in _compiledQuery(_db, 20))

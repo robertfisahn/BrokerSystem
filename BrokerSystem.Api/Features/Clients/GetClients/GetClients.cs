@@ -2,6 +2,7 @@
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Dapper;
 
 namespace BrokerSystem.Api.Features.Clients.GetClients;
 
@@ -29,67 +30,58 @@ public class GetClientsHandler(BrokerSystemDbContext db) : IRequestHandler<GetCl
 {
     public async Task<PaginatedResult<GetClientsDto>> Handle(GetClientsQuery request, CancellationToken cancellationToken)
     {
-        var query = db.Clients.AsNoTracking().AsQueryable();
+        using var connection = db.Database.GetDbConnection();
 
-        // Search filter (Multi-word support)
+        var whereClause = "WHERE 1=1";
+        var parameters = new DynamicParameters();
+
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var searchWords = request.Search.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var word in searchWords)
+            var searchWords = request.Search.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < searchWords.Length; i++)
             {
-                query = query.Where(c =>
-                    (c.FirstName != null && c.FirstName.ToLower().Contains(word)) ||
-                    (c.LastName != null && c.LastName.ToLower().Contains(word)) ||
-                    (c.CompanyName != null && c.CompanyName.ToLower().Contains(word))
-                );
+                var pName = $"@p{i}";
+                whereClause += $" AND (c.first_name LIKE {pName} OR c.last_name LIKE {pName} OR c.company_name LIKE {pName})";
+                parameters.Add(pName, $"%{searchWords[i]}%");
             }
         }
 
-        // Get total count before pagination
-        var totalCount = await query.CountAsync(cancellationToken);
+        // 2. Count Query
+        var countSql = $"SELECT COUNT(*) FROM clients c {whereClause}";
+        var totalCount = await connection.ExecuteScalarAsync<int>(countSql, parameters);
 
-        // Sorting
-        query = request.SortBy.ToLower() switch
+        // 3. Sorting
+        var orderBy = request.SortBy.ToLower() switch
         {
-            "firstname" => request.SortDescending 
-                ? query.OrderByDescending(c => c.FirstName) 
-                : query.OrderBy(c => c.FirstName),
-            "lastname" => request.SortDescending 
-                ? query.OrderByDescending(c => c.LastName) 
-                : query.OrderBy(c => c.LastName),
-            "companyname" => request.SortDescending 
-                ? query.OrderByDescending(c => c.CompanyName) 
-                : query.OrderBy(c => c.CompanyName),
-            "clienttype" => request.SortDescending 
-                ? query.OrderByDescending(c => c.ClientType.TypeName) 
-                : query.OrderBy(c => c.ClientType.TypeName),
-            _ => request.SortDescending 
-                ? query.OrderByDescending(c => c.ClientId) 
-                : query.OrderBy(c => c.ClientId)
+            "firstname" => "c.first_name",
+            "lastname" => "c.last_name",
+            "companyname" => "c.company_name",
+            "clienttype" => "ct.type_name",
+            _ => "c.client_id"
         };
+        orderBy += request.SortDescending ? " DESC" : " ASC";
 
-        // Pagination
-        var items = await query
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
-            .Select(c => new GetClientsDto
-            {
-                ClientId = c.ClientId,
-                FirstName = c.FirstName,
-                LastName = c.LastName,
-                CompanyName = c.CompanyName,
-                ClientType = c.ClientType.TypeName,
-                PrimaryContact = c.ClientContacts
-                    .Where(ct => ct.IsPrimary)
-                    .Select(ct => ct.ContactValue)
-                    .FirstOrDefault(),
-                City = c.ClientAddresses
-                    .Where(a => a.IsCurrent)
-                    .Select(a => a.City)
-                    .FirstOrDefault(),
-                ActivePoliciesCount = c.Policies.Count(p => p.Status.IsActivePolicy)
-            })
-            .ToListAsync(cancellationToken);
+        // 4. Data Query (Dapper Optimized)
+        var sql = @$"
+            SELECT 
+                c.client_id AS ClientId, 
+                c.first_name AS FirstName, 
+                c.last_name AS LastName, 
+                c.company_name AS CompanyName,
+                ct.type_name AS ClientType,
+                (SELECT TOP 1 cc.contact_value FROM client_contacts cc WHERE cc.client_id = c.client_id AND cc.is_primary = 1) AS PrimaryContact,
+                (SELECT TOP 1 ca.city FROM client_addresses ca WHERE ca.client_id = c.client_id AND ca.is_current = 1) AS City,
+                (SELECT COUNT(*) FROM policies p JOIN policy_statuses ps ON p.status_id = ps.status_id WHERE p.client_id = c.client_id AND ps.is_active_policy = 1) AS ActivePoliciesCount
+            FROM clients c
+            JOIN client_types ct ON c.client_type_id = ct.client_type_id
+            {whereClause}
+            ORDER BY {orderBy}
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+        parameters.Add("@Offset", (request.Page - 1) * request.PageSize);
+        parameters.Add("@PageSize", request.PageSize);
+
+        var items = (await connection.QueryAsync<GetClientsDto>(sql, parameters)).ToList();
 
         return new PaginatedResult<GetClientsDto>(items, totalCount, request.Page, request.PageSize);
     }
