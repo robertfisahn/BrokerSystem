@@ -1,4 +1,5 @@
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
+using Dapper;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,28 +18,39 @@ public class GetPolicyLookupsHandler(BrokerSystemDbContext db) : IRequestHandler
 {
     public async Task<PolicyLookupsResponse> Handle(GetPolicyLookupsQuery request, CancellationToken ct)
     {
-        var clients = await db.Clients
-            .Where(c => c.IsActive)
-            .OrderBy(c => c.LastName ?? c.CompanyName)
-            .Select(c => new LookupDto(c.ClientId, 
-                !string.IsNullOrWhiteSpace(c.CompanyName) ? c.CompanyName :
-                !string.IsNullOrWhiteSpace(c.FirstName + c.LastName) ? ((c.FirstName ?? "") + " " + (c.LastName ?? "")).Trim() :
-                $"Client #{c.ClientId}"))
-            .ToListAsync(ct);
+        using var connection = db.Database.GetDbConnection();
 
-        var policyTypes = await db.PolicyTypes
-            .Where(t => t.IsActive)
-            .OrderBy(t => t.TypeName)
-            .Select(t => new LookupDto(t.PolicyTypeId, t.TypeName))
-            .ToListAsync(ct);
+        const string sql = @"
+            -- Clients
+            SELECT client_id AS Id, first_name AS FirstName, last_name AS LastName, company_name AS CompanyName 
+            FROM clients WHERE is_active = 1 ORDER BY last_name, company_name;
 
-        var agents = await db.Agents
-            .Where(a => a.IsActive)
-            .OrderBy(a => a.LastName)
-            .Select(a => new LookupDto(a.AgentId, 
-                !string.IsNullOrWhiteSpace(a.FirstName + a.LastName) ? ((a.FirstName ?? "") + " " + (a.LastName ?? "")).Trim() :
-                $"Agent #{a.AgentId}"))
-            .ToListAsync(ct);
+            -- PolicyTypes
+            SELECT policy_type_id AS Id, type_name AS Name 
+            FROM policy_types WHERE is_active = 1 ORDER BY type_name;
+
+            -- Agents
+            SELECT agent_id AS Id, first_name AS FirstName, last_name AS LastName 
+            FROM agents WHERE is_active = 1 ORDER BY last_name;";
+
+        using var multi = await connection.QueryMultipleAsync(sql);
+
+        var rawClients = await multi.ReadAsync<dynamic>();
+        var clients = rawClients.Select(c => new LookupDto(
+            (int)c.Id,
+            !string.IsNullOrWhiteSpace((string?)c.CompanyName) ? (string)c.CompanyName :
+            !string.IsNullOrWhiteSpace((string?)c.FirstName + (string?)c.LastName) ? (((string?)c.FirstName ?? "") + " " + ((string?)c.LastName ?? "")).Trim() :
+            $"Client #{c.Id}"
+        )).ToList();
+
+        var policyTypes = (await multi.ReadAsync<LookupDto>()).ToList();
+
+        var rawAgents = await multi.ReadAsync<dynamic>();
+        var agents = rawAgents.Select(a => new LookupDto(
+            (int)a.Id,
+            !string.IsNullOrWhiteSpace((string?)a.FirstName + (string?)a.LastName) ? (((string?)a.FirstName ?? "") + " " + ((string?)a.LastName ?? "")).Trim() :
+            $"Agent #{a.Id}"
+        )).ToList();
 
         return new PolicyLookupsResponse(clients, policyTypes, agents);
     }
