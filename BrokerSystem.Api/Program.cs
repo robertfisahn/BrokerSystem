@@ -22,6 +22,10 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<ErrorHandlingMiddleware>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
+
+// SIGNALR
+builder.Services.AddSignalR();
+
 // MEDIATR
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 // DB CONTEXT
@@ -36,14 +40,23 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowedBrokerSystemUI",
         builder => builder.WithOrigins("http://localhost:5173")
                           .AllowAnyHeader()
-                          .AllowAnyMethod());
+                          .AllowAnyMethod()
+                          .AllowCredentials());
 });
 
 var app = builder.Build();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
+// CORS 
+app.UseCors("AllowedBrokerSystemUI");
+
+app.UseHttpsRedirection();
+
 app.MapControllers();
+
+// SIGNALR HUB
+app.MapHub<BrokerSystem.Api.Infrastructure.Hubs.BrokerHub>("/broker-hub");
 
 // SWAGGER
 if (app.Environment.IsDevelopment())
@@ -52,8 +65,4 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// CORS 
-app.UseCors("AllowedBrokerSystemUI");
-
-app.UseHttpsRedirection();
 app.Run();

@@ -8,6 +8,7 @@ import '@mantine/core/styles.css'
 import '@mantine/notifications/styles.css'
 import './index.css'
 import App from './App.tsx'
+import { SignalRProvider } from './providers/SignalRProvider.tsx'
 
 const theme = createTheme({
     primaryColor: 'blue',
@@ -21,7 +22,9 @@ createRoot(document.getElementById('root')!).render(
         <QueryClientProvider client={queryClient}>
             <MantineProvider theme={theme} defaultColorScheme="dark">
                 <Notifications position="top-right" zIndex={1000} />
-                <App />
+                <SignalRProvider>
+                    <App />
+                </SignalRProvider>
             </MantineProvider>
         </QueryClientProvider>
     </StrictMode>,
