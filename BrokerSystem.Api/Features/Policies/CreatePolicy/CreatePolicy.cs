@@ -1,8 +1,10 @@
 using BrokerSystem.Api.Common.Exceptions;
+using BrokerSystem.Api.Infrastructure.Hubs;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Infrastructure.Persistence.Entities;
 using FluentValidation;
 using MediatR;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace BrokerSystem.Api.Features.Policies.CreatePolicy;
@@ -34,7 +36,7 @@ public class CreatePolicyValidator : AbstractValidator<CreatePolicyCommand>
     }
 }
 
-public class CreatePolicyHandler(BrokerSystemDbContext db) : IRequestHandler<CreatePolicyCommand, int>
+public class CreatePolicyHandler(BrokerSystemDbContext db, IHubContext<BrokerHub> hub) : IRequestHandler<CreatePolicyCommand, int>
 {
     public async Task<int> Handle(CreatePolicyCommand request, CancellationToken ct)
     {
@@ -65,6 +67,11 @@ public class CreatePolicyHandler(BrokerSystemDbContext db) : IRequestHandler<Cre
 
         db.Policies.Add(policy);
         await db.SaveChangesAsync(ct);
+
+        await hub.Clients.All.SendAsync("ReceiveNotification", 
+            "Nowa Polisa", 
+            $"Utworzono polisę o numerze {policy.PolicyNumber}", 
+            ct);
 
         return policy.PolicyId;
     }
