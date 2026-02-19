@@ -1,13 +1,16 @@
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Common.Caching;
+using BrokerSystem.Api.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Data;
 using Dapper;
 
 namespace BrokerSystem.Api.Features.Dashboard;
 
+/// <summary>
+/// Query to retrieve aggregated dashboard statistics, including sales trends and distribution charts.
+/// </summary>
 public record GetDashboardStatsQuery() : IRequest<DashboardStatsResponse>;
 
 public record DashboardStatsResponse(
@@ -34,31 +37,19 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
 {
     private const string CacheKey = "DashboardStats";
 
-    public async Task<DashboardStatsResponse> Handle(GetDashboardStatsQuery request, CancellationToken ct)
-    {
-        return await cache.GetOrCreateAsync(CacheKey, async () =>
-        {
-            Console.WriteLine($"[DB HIT] {DateTime.Now:HH:mm:ss}");
-            using var connection = db.Database.GetDbConnection();
-            
-            const string sql = @"
-                -- Monthly Sales (Zoptymalizowany, ostatnie 12 miesięcy, poprawna kolejność)
-                WITH MonthlySums AS (
-                    SELECT 
-                        YEAR(start_date) as Yr, 
-                        MONTH(start_date) as Mo, 
-                        ISNULL(SUM(premium_amount), 0) as TotalPremium, 
-                        COUNT(*) as PolicyCount
-                    FROM policies
-                    WHERE start_date >= DATEADD(month, -11, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
-                    GROUP BY YEAR(start_date), MONTH(start_date)
-                )
+    /// <summary>
+    /// Builds the multi-result SQL query for dashboard statistics.
+    /// </summary>
+    public static string GetDashboardStatsSql(ISqlDialect sqlDialect) => $@"
+                -- Monthly Sales (Cross-platform version)
                 SELECT 
-                    CONCAT(Yr, '-', RIGHT('0' + CAST(Mo AS VARCHAR), 2)) as Month, 
-                    TotalPremium, 
-                    PolicyCount
-                FROM MonthlySums
-                ORDER BY Yr, Mo;
+                    {sqlDialect.FormattedMonthYear("start_date")} as Month, 
+                    COALESCE(SUM(premium_amount), 0) as TotalPremium, 
+                    COUNT(*) as PolicyCount
+                FROM policies
+                WHERE start_date >= @StartDateLimit
+                GROUP BY {sqlDialect.Year("start_date")}, {sqlDialect.Month("start_date")}
+                ORDER BY {sqlDialect.Year("start_date")}, {sqlDialect.Month("start_date")};
 
                 -- Client Type Distribution
                 SELECT ct.type_name as ClientType, COUNT(*) as ClientCount
@@ -79,10 +70,21 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
                     (SELECT COUNT(*) FROM clients) as TotalClients,
                     (SELECT COUNT(*) FROM policies) as TotalPolicies,
                     10 as ActiveClaims,
-                    ISNULL((SELECT SUM(premium_amount) FROM policies), 0) as TotalPremiumVolume;
+                    COALESCE((SELECT SUM(premium_amount) FROM policies), 0) as TotalPremiumVolume;
             ";
 
-            using var multi = await connection.QueryMultipleAsync(sql);
+    public async Task<DashboardStatsResponse> Handle(GetDashboardStatsQuery request, CancellationToken ct)
+    {
+        return await cache.GetOrCreateAsync(CacheKey, async () =>
+        {
+            using var connection = db.Database.GetDbConnection();
+            
+            var sqlDialect = db.Database.Sql();
+            var startDateLimit = CalculateStartDateLimit(DateTime.Today);
+
+            var sql = GetDashboardStatsSql(sqlDialect);
+
+            using var multi = await connection.QueryMultipleAsync(sql, new { StartDateLimit = startDateLimit });
 
             var monthlySales = (await multi.ReadAsync<MonthlySales>()).ToList();
             var clientTypes = (await multi.ReadAsync<ClientTypeDistribution>()).ToList();
@@ -92,6 +94,12 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
             return new DashboardStatsResponse(monthlySales, clientTypes, policyStatuses, kpis);
         }, TimeSpan.FromMinutes(10));
     }
+
+    /// <summary>
+    /// Pure logic to calculate the start date for a 12-month trailing window.
+    /// </summary>
+    public static DateTime CalculateStartDateLimit(DateTime today) => 
+        new DateTime(today.Year, today.Month, 1).AddMonths(-11);
 }
 
 [ApiController]

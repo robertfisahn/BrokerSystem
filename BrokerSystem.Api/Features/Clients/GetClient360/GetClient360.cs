@@ -2,12 +2,24 @@ using BrokerSystem.Api.Common.Exceptions;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using FluentValidation;
 using Dapper;
 using System.Data;
 
 namespace BrokerSystem.Api.Features.Clients.GetClient360;
 
+/// <summary>
+/// Query to retrieve a comprehensive 360-degree view of a client, including contacts, addresses, policies, and claims.
+/// </summary>
 public record GetClient360Query(int ClientId) : IRequest<Client360Dto?>;
+
+public class GetClient360Validator : AbstractValidator<GetClient360Query>
+{
+    public GetClient360Validator()
+    {
+        RuleFor(x => x.ClientId).GreaterThan(0).WithMessage("ClientId must be greater than 0.");
+    }
+}
 
 public record Client360Dto
 {
@@ -66,8 +78,24 @@ public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<Get
     public async Task<Client360Dto?> Handle(GetClient360Query request, CancellationToken cancellationToken)
     {
         using var connection = db.Database.GetDbConnection();
+
+        using var multi = await connection.QueryMultipleAsync(GetMainSql, new { Id = request.ClientId });
         
-        const string sql = @"
+        var client = await multi.ReadFirstOrDefaultAsync<Client360Dto>();
+        if (client == null)
+        {
+            throw new NotFoundException($"Klient o ID {request.ClientId} nie został znaleziony.");
+        }
+
+        var contacts = await multi.ReadAsync<Client360ContactDto>();
+        var addresses = await multi.ReadAsync<Client360AddressDto>();
+        var policies = await multi.ReadAsync<Client360PolicyDtoInternal>();
+        var claims = await multi.ReadAsync<Client360ClaimDtoInternal>();
+
+        return MapToClient360Dto(client, contacts, addresses, policies, claims);
+    }
+
+    public const string GetMainSql = @"
             SELECT c.client_id AS ClientId, c.first_name AS FirstName, c.last_name AS LastName, 
                    c.company_name AS CompanyName, c.tax_id AS TaxId, c.registration_date AS RegistrationDate,
                    ct.type_name AS ClientType
@@ -97,19 +125,16 @@ public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<Get
             WHERE cl.policy_id IN (SELECT policy_id FROM policies WHERE client_id = @Id);
         ";
 
-        using var multi = await connection.QueryMultipleAsync(sql, new { Id = request.ClientId });
-        
-        var client = await multi.ReadFirstOrDefaultAsync<Client360Dto>();
-        if (client == null)
-        {
-            throw new NotFoundException($"Klient o ID {request.ClientId} nie został znaleziony.");
-        }
-
-        var contacts = await multi.ReadAsync<Client360ContactDto>();
-        var addresses = await multi.ReadAsync<Client360AddressDto>();
-        var policies = await multi.ReadAsync<Client360PolicyDtoInternal>();
-        var claims = await multi.ReadAsync<Client360ClaimDtoInternal>();
-
+    /// <summary>
+    /// Maps raw database results into a structured Client360Dto model, linking policies with their related claims.
+    /// </summary>
+    public static Client360Dto MapToClient360Dto(
+        Client360Dto client,
+        IEnumerable<Client360ContactDto> contacts,
+        IEnumerable<Client360AddressDto> addresses,
+        IEnumerable<Client360PolicyDtoInternal> policies,
+        IEnumerable<Client360ClaimDtoInternal> claims)
+    {
         var claimsLookup = claims.ToLookup(c => c.PolicyId);
         var finalPolicies = policies.Select(p => new Client360PolicyDto
         {
@@ -132,12 +157,12 @@ public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<Get
 
         return client with 
         { 
-            Contacts = contacts.ToList(), 
-            Addresses = addresses.ToList(), 
+            Contacts = contacts.OrderByDescending(c => c.IsPrimary).ToList(), 
+            Addresses = addresses.OrderByDescending(a => a.IsCurrent).ToList(), 
             Policies = finalPolicies 
         };
     }
 
-    private record Client360PolicyDtoInternal : Client360PolicyDto { public int PolicyId { get; init; } }
-    private record Client360ClaimDtoInternal : Client360ClaimDto { public int PolicyId { get; init; } }
+    public record Client360PolicyDtoInternal : Client360PolicyDto { public new int PolicyId { get; init; } }
+    public record Client360ClaimDtoInternal : Client360ClaimDto { public int PolicyId { get; init; } }
 }

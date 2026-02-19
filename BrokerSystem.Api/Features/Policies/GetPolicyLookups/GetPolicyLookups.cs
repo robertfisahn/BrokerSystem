@@ -36,22 +36,42 @@ public class GetPolicyLookupsHandler(BrokerSystemDbContext db) : IRequestHandler
         using var multi = await connection.QueryMultipleAsync(sql);
 
         var rawClients = await multi.ReadAsync<dynamic>();
-        var clients = rawClients.Select(c => new LookupDto(
-            (int)c.Id,
-            !string.IsNullOrWhiteSpace((string?)c.CompanyName) ? (string)c.CompanyName :
-            !string.IsNullOrWhiteSpace((string?)c.FirstName + (string?)c.LastName) ? (((string?)c.FirstName ?? "") + " " + ((string?)c.LastName ?? "")).Trim() :
-            $"Client #{c.Id}"
-        )).ToList();
+        var clients = (rawClients as IEnumerable<dynamic>).Select(c => (LookupDto)LookupMapper.MapClient(c)).ToList();
 
         var policyTypes = (await multi.ReadAsync<LookupDto>()).ToList();
 
         var rawAgents = await multi.ReadAsync<dynamic>();
-        var agents = rawAgents.Select(a => new LookupDto(
-            (int)a.Id,
-            !string.IsNullOrWhiteSpace((string?)a.FirstName + (string?)a.LastName) ? (((string?)a.FirstName ?? "") + " " + ((string?)a.LastName ?? "")).Trim() :
-            $"Agent #{a.Id}"
-        )).ToList();
+        var agents = (rawAgents as IEnumerable<dynamic>).Select(a => (LookupDto)LookupMapper.MapAgent(a)).ToList();
 
         return new PolicyLookupsResponse(clients, policyTypes, agents);
+    }
+}
+
+public static class LookupMapper
+{
+    public static LookupDto MapClient(dynamic c)
+    {
+        int id = (int)c.Id;
+        string? companyName = (string?)c.CompanyName;
+        string? firstName = (string?)c.FirstName;
+        string? lastName = (string?)c.LastName;
+
+        string name = !string.IsNullOrWhiteSpace(companyName) ? companyName :
+                     !string.IsNullOrWhiteSpace(firstName + lastName) ? (firstName?.Trim() + " " + lastName?.Trim()).Trim() :
+                     $"Client #{id}";
+
+        return new LookupDto(id, name);
+    }
+
+    public static LookupDto MapAgent(dynamic a)
+    {
+        int id = (int)a.Id;
+        string? firstName = (string?)a.FirstName;
+        string? lastName = (string?)a.LastName;
+
+        string name = !string.IsNullOrWhiteSpace(firstName + lastName) ? (firstName?.Trim() + " " + lastName?.Trim()).Trim() :
+                     $"Agent #{id}";
+
+        return new LookupDto(id, name);
     }
 }

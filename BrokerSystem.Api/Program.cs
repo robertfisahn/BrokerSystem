@@ -29,10 +29,13 @@ builder.Services.AddSignalR();
 // MEDIATR
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 // DB CONTEXT
-builder.Services.AddDbContext<BrokerSystemDbContext>(options =>
+if (!builder.Environment.IsEnvironment("IntegrationTest"))
 {
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
+    builder.Services.AddDbContext<BrokerSystemDbContext>(options =>
+    {
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    });
+}
 
 // CORS
 builder.Services.AddCors(options =>
@@ -66,3 +69,5 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+public partial class Program { }

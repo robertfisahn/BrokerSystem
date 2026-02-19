@@ -1,5 +1,6 @@
 using BrokerSystem.Api.Common.Exceptions;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
+using BrokerSystem.Api.Infrastructure.Persistence;
 using Dapper;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +27,10 @@ public record PolicyExportDto(
 
 public class ExportPolicyHandler(BrokerSystemDbContext db) : IRequestHandler<ExportPolicyQuery, byte[]>
 {
-    public async Task<byte[]> Handle(ExportPolicyQuery request, CancellationToken ct)
-    {
-        using var connection = db.Database.GetDbConnection();
-
-        const string sql = @"
+    /// <summary>
+    /// Builds the SQL query for policy export, joining clients, types, statuses, and agents.
+    /// </summary>
+    public static string GetExportSql(ISqlDialect sqlDialect) => $@"
             SELECT 
                 p.policy_number AS PolicyNumber,
                 c.first_name AS ClientFirstName,
@@ -42,13 +42,20 @@ public class ExportPolicyHandler(BrokerSystemDbContext db) : IRequestHandler<Exp
                 p.start_date AS StartDate,
                 p.end_date AS EndDate,
                 ps.status_name AS StatusName,
-                (a.first_name + ' ' + a.last_name) AS AgentName
+                {sqlDialect.Concat("a.first_name", "' '", "a.last_name")} AS AgentName
             FROM policies p
             JOIN clients c ON p.client_id = c.client_id
             JOIN policy_types pt ON p.policy_type_id = pt.policy_type_id
             JOIN policy_statuses ps ON p.status_id = ps.status_id
             JOIN agents a ON p.agent_id = a.agent_id
             WHERE p.policy_id = @PolicyId";
+
+    public async Task<byte[]> Handle(ExportPolicyQuery request, CancellationToken ct)
+    {
+        using var connection = db.Database.GetDbConnection();
+        var sqlDialect = db.Database.Sql();
+
+        var sql = GetExportSql(sqlDialect);
 
         var policyDto = await connection.QueryFirstOrDefaultAsync<PolicyExportDto>(sql, new { PolicyId = request.PolicyId });
 
