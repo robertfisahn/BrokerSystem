@@ -6,7 +6,20 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Dapper;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Clients.GetClients;
+
+public class GetClientsEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/clients", async (IMediator mediator, [AsParameters] GetClientsQuery query) => 
+            Results.Ok(await mediator.Send(query)))
+            .WithName("GetClients")
+            .WithTags("Clients");
+    }
+}
 
 /// <summary>
 /// Query to retrieve a paginated, filtered, and sorted list of clients.

@@ -6,7 +6,20 @@ using FluentValidation;
 using Dapper;
 using System.Data;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Clients.GetClient360;
+
+public class GetClient360Endpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/clients/{id:int}/360", async (int id, IMediator mediator) => 
+            Results.Ok(await mediator.Send(new GetClient360Query(id))))
+            .WithName("GetClient360")
+            .WithTags("Clients");
+    }
+}
 
 /// <summary>
 /// Query to retrieve a comprehensive 360-degree view of a client, including contacts, addresses, policies, and claims.

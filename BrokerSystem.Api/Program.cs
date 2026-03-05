@@ -2,9 +2,11 @@ using BrokerSystem.Api.Common.Caching;
 using BrokerSystem.Api.Common.Middleware;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Infrastructure;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
 using Dapper;
+using BrokerSystem.Api.Common.Endpoints;
 
 // Register Dapper Type Handlers (Must be early)
 SqlMapper.AddTypeHandler(new DateOnlyTypeHandler());
@@ -18,7 +20,6 @@ var builder = WebApplication.CreateBuilder(args);
 // SWAGGER
 builder.Services.AddSwaggerGen();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddControllers();
 builder.Services.AddScoped<ErrorHandlingMiddleware>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
@@ -27,7 +28,13 @@ builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 builder.Services.AddSignalR();
 
 // MEDIATR
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+builder.Services.AddMediatR(cfg => 
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
+
 // DB CONTEXT
 if (!builder.Environment.IsEnvironment("IntegrationTest"))
 {
@@ -56,7 +63,7 @@ app.UseCors("AllowedBrokerSystemUI");
 
 app.UseHttpsRedirection();
 
-app.MapControllers();
+app.MapAllEndpoints();
 
 // SIGNALR HUB
 app.MapHub<BrokerSystem.Api.Infrastructure.Hubs.BrokerHub>("/broker-hub");
