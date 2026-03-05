@@ -5,7 +5,20 @@ using Microsoft.EntityFrameworkCore;
 using FluentValidation;
 using Dapper;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Policies.GetPolicies;
+
+public class GetPoliciesEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/policies", async (IMediator mediator, [AsParameters] GetPoliciesQuery query) => 
+            Results.Ok(await mediator.Send(query)))
+            .WithName("GetPolicies")
+            .WithTags("Policies");
+    }
+}
 
 /// <summary>
 /// Query to retrieve a paginated, filtered, and sorted list of policies.
@@ -32,15 +45,17 @@ public record PagedPoliciesResponse(
     int Page,
     int PageSize);
 
-public record PolicyDto(
-    int PolicyId,
-    string PolicyNumber,
-    string ClientName,
-    string PolicyType,
-    decimal TotalPremium,
-    DateOnly StartDate,
-    DateOnly EndDate,
-    string Status);
+public class PolicyDto
+{
+    public int PolicyId { get; set; }
+    public string PolicyNumber { get; set; } = string.Empty;
+    public string ClientName { get; set; } = string.Empty;
+    public string PolicyType { get; set; } = string.Empty;
+    public decimal TotalPremium { get; set; }
+    public DateOnly StartDate { get; set; }
+    public DateOnly EndDate { get; set; }
+    public string Status { get; set; } = string.Empty;
+}
 
 public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetPoliciesQuery, PagedPoliciesResponse>
 {

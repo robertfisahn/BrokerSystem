@@ -2,36 +2,64 @@ using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Common.Caching;
 using BrokerSystem.Api.Infrastructure.Persistence;
 using MediatR;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using FluentValidation;
 using Dapper;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Dashboard;
+
+public class GetDashboardStatsEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/dashboard/stats", async (IMediator mediator) => 
+            Results.Ok(await mediator.Send(new GetDashboardStatsQuery())))
+            .WithName("GetDashboardStats")
+            .WithTags("Dashboard");
+    }
+}
 
 /// <summary>
 /// Query to retrieve aggregated dashboard statistics, including sales trends and distribution charts.
 /// </summary>
 public record GetDashboardStatsQuery() : IRequest<DashboardStatsResponse>;
 
-public record DashboardStatsResponse(
-    List<MonthlySales> MonthlySales,
-    List<ClientTypeDistribution> ClientTypeDistribution,
-    List<PolicyStatusDistribution> PolicyStatusDistribution,
-    DashboardKpis Kpis
-);
+public class DashboardStatsResponse
+{
+    public List<MonthlySales> MonthlySales { get; set; } = new();
+    public List<ClientTypeDistribution> ClientTypeDistribution { get; set; } = new();
+    public List<PolicyStatusDistribution> PolicyStatusDistribution { get; set; } = new();
+    public DashboardKpis Kpis { get; set; } = new();
+}
 
-public record MonthlySales(string Month, decimal TotalPremium, int PolicyCount);
+public class MonthlySales
+{
+    public string Month { get; set; } = null!;
+    public decimal TotalPremium { get; set; }
+    public int PolicyCount { get; set; }
+}
 
-public record ClientTypeDistribution(string ClientType, int ClientCount);
+public class ClientTypeDistribution
+{
+    public string ClientType { get; set; } = null!;
+    public int ClientCount { get; set; }
+}
 
-public record PolicyStatusDistribution(string PolicyStatus, int PolicyCount);
+public class PolicyStatusDistribution
+{
+    public string PolicyStatus { get; set; } = null!;
+    public int PolicyCount { get; set; }
+}
 
-public record DashboardKpis(
-    int TotalClients,
-    int TotalPolicies,
-    int ActiveClaims,
-    decimal TotalPremiumVolume
-);
+public class DashboardKpis
+{
+    public int TotalClients { get; set; }
+    public int TotalPolicies { get; set; }
+    public int ActiveClaims { get; set; }
+    public decimal TotalPremiumVolume { get; set; }
+}
 
 public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService cache) : IRequestHandler<GetDashboardStatsQuery, DashboardStatsResponse>
 {
@@ -91,7 +119,13 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
             var policyStatuses = (await multi.ReadAsync<PolicyStatusDistribution>()).ToList();
             var kpis = await multi.ReadSingleAsync<DashboardKpis>();
 
-            return new DashboardStatsResponse(monthlySales, clientTypes, policyStatuses, kpis);
+            return new DashboardStatsResponse
+            {
+                MonthlySales = monthlySales,
+                ClientTypeDistribution = clientTypes,
+                PolicyStatusDistribution = policyStatuses,
+                Kpis = kpis
+            };
         }, TimeSpan.FromMinutes(10));
     }
 
@@ -102,14 +136,3 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
         new DateTime(today.Year, today.Month, 1).AddMonths(-11);
 }
 
-[ApiController]
-[Route("api/dashboard")]
-public class DashboardController(IMediator mediator) : ControllerBase
-{
-    [HttpGet("stats")]
-    public async Task<IActionResult> GetStats(CancellationToken ct)
-    {
-        var result = await mediator.Send(new GetDashboardStatsQuery(), ct);
-        return Ok(result);
-    }
-}

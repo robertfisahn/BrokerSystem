@@ -4,14 +4,9 @@ using BrokerSystem.Api.Common.Exceptions;
 
 namespace BrokerSystem.Api.Common.Middleware;
 
-public class ErrorHandlingMiddleware : IMiddleware
+public class ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger) : IMiddleware
 {
-    private readonly ILogger<ErrorHandlingMiddleware> _logger;
-
-    public ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger<ErrorHandlingMiddleware> _logger = logger;
 
     public async Task InvokeAsync(HttpContext context, RequestDelegate next)
     {
@@ -27,23 +22,33 @@ public class ErrorHandlingMiddleware : IMiddleware
         {
             await HandleExceptionAsync(context, HttpStatusCode.BadRequest, ex.Message);
         }
+        catch (FluentValidation.ValidationException ex)
+        {
+            var errors = ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage });
+            await HandleExceptionAsync(context, HttpStatusCode.BadRequest, "Validation failed", errors);
+        }
         catch (ForbidException ex)
         {
             await HandleExceptionAsync(context, HttpStatusCode.Forbidden, ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Something went wrong.");
-            await HandleExceptionAsync(context, HttpStatusCode.InternalServerError, "Something went wrong.");
+            var env = context.RequestServices.GetService<IHostEnvironment>();
+            var message = (env?.IsDevelopment() == true || env?.IsEnvironment("IntegrationTest") == true) 
+                ? ex.Message 
+                : "Something went wrong.";
+
+            _logger.LogError(ex, message);
+            await HandleExceptionAsync(context, HttpStatusCode.InternalServerError, message);
         }
     }
 
-    private static async Task HandleExceptionAsync(HttpContext context, HttpStatusCode statusCode, string message)
+    private static async Task HandleExceptionAsync(HttpContext context, HttpStatusCode statusCode, string message, object? details = null)
     {
         context.Response.StatusCode = (int)statusCode;
         context.Response.ContentType = "application/json";
 
-        var result = JsonSerializer.Serialize(new { error = message });
+        var result = JsonSerializer.Serialize(new { error = message, details });
         await context.Response.WriteAsync(result);
     }
 }

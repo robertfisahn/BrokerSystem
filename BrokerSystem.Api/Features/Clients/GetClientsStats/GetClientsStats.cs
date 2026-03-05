@@ -3,7 +3,20 @@ using Dapper;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Clients.GetClientsStats;
+
+public class GetClientsStatsEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/clients/stats", async (IMediator mediator) => 
+            Results.Ok(await mediator.Send(new GetClientsStatsQuery())))
+            .WithName("GetClientsStats")
+            .WithTags("Clients");
+    }
+}
 
 /// <summary>
 /// Query to retrieve high-level client statistics for dashboard cards.

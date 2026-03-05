@@ -8,22 +8,40 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Policies.ExportPolicy;
+
+public class ExportPolicyEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/policies/{id:int}/export", async (int id, IMediator mediator) => 
+        {
+            var pdf = await mediator.Send(new ExportPolicyQuery(id));
+            return Results.File(pdf, "application/pdf", $"Polisa_{id}.pdf");
+        })
+        .WithName("ExportPolicy")
+        .WithTags("Policies");
+    }
+}
 
 public record ExportPolicyQuery(int PolicyId) : IRequest<byte[]>;
 
-public record PolicyExportDto(
-    string PolicyNumber,
-    string ClientFirstName,
-    string ClientLastName,
-    string? ClientCompanyName,
-    string PolicyTypeName,
-    decimal SumInsured,
-    decimal PremiumAmount,
-    DateTime StartDate,
-    DateTime EndDate,
-    string StatusName,
-    string AgentName);
+public class PolicyExportDto
+{
+    public string PolicyNumber { get; set; } = string.Empty;
+    public string ClientFirstName { get; set; } = string.Empty;
+    public string ClientLastName { get; set; } = string.Empty;
+    public string? ClientCompanyName { get; set; }
+    public string PolicyTypeName { get; set; } = string.Empty;
+    public decimal SumInsured { get; set; }
+    public decimal PremiumAmount { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public string StatusName { get; set; } = string.Empty;
+    public string AgentName { get; set; } = string.Empty;
+}
 
 public class ExportPolicyHandler(BrokerSystemDbContext db) : IRequestHandler<ExportPolicyQuery, byte[]>
 {

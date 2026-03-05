@@ -3,7 +3,20 @@ using Dapper;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Policies.GetPolicyLookups;
+
+public class GetPolicyLookupsEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapGet("api/policies/lookups", async (IMediator mediator) => 
+            Results.Ok(await mediator.Send(new GetPolicyLookupsQuery())))
+            .WithName("GetPolicyLookups")
+            .WithTags("Policies");
+    }
+}
 
 public record GetPolicyLookupsQuery : IRequest<PolicyLookupsResponse>;
 
@@ -12,7 +25,18 @@ public record PolicyLookupsResponse(
     List<LookupDto> PolicyTypes,
     List<LookupDto> Agents);
 
-public record LookupDto(int Id, string Name);
+public class LookupDto
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+
+    public LookupDto() { }
+    public LookupDto(int id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
+}
 
 public class GetPolicyLookupsHandler(BrokerSystemDbContext db) : IRequestHandler<GetPolicyLookupsQuery, PolicyLookupsResponse>
 {
@@ -51,7 +75,7 @@ public static class LookupMapper
 {
     public static LookupDto MapClient(dynamic c)
     {
-        int id = (int)c.Id;
+        int id = Convert.ToInt32(c.Id);
         string? companyName = (string?)c.CompanyName;
         string? firstName = (string?)c.FirstName;
         string? lastName = (string?)c.LastName;
@@ -65,7 +89,7 @@ public static class LookupMapper
 
     public static LookupDto MapAgent(dynamic a)
     {
-        int id = (int)a.Id;
+        int id = Convert.ToInt32(a.Id);
         string? firstName = (string?)a.FirstName;
         string? lastName = (string?)a.LastName;
 

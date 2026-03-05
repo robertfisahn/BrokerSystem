@@ -73,14 +73,14 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<AuditLog>(entity =>
         {
-            entity.Property(e => e.ChangedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.ChangedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.ChangedByUser).WithMany(p => p.AuditLogs).HasConstraintName("FK_audit_log_users");
         });
 
         modelBuilder.Entity<Claim>(entity =>
         {
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Policy).WithMany(p => p.Claims)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -102,7 +102,7 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<ClaimStatusHistory>(entity =>
         {
-            entity.Property(e => e.ChangedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.ChangedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Claim).WithMany(p => p.ClaimStatusHistories).HasConstraintName("FK_claim_status_history_claims");
 
@@ -115,10 +115,10 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<Client>(entity =>
         {
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.RegistrationDate).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.RegistrationDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.ClientType).WithMany(p => p.Clients)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -133,7 +133,7 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
             entity.Property(e => e.Country).HasDefaultValue("Poland");
             entity.Property(e => e.IsCurrent).HasDefaultValue(true);
-            entity.Property(e => e.ValidFrom).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.ValidFrom).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Client).WithMany(p => p.ClientAddresses).HasConstraintName("FK_client_addresses_clients");
         });
@@ -189,8 +189,8 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<Policy>(entity =>
         {
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Agent).WithMany(p => p.Policies)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -223,7 +223,7 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<PolicyStatusHistory>(entity =>
         {
-            entity.Property(e => e.ChangedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.ChangedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.NewStatus).WithMany(p => p.PolicyStatusHistoryNewStatuses)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -245,7 +245,7 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<RiskAssessment>(entity =>
         {
-            entity.Property(e => e.AssessmentDate).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.AssessmentDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(d => d.Policy).WithMany(p => p.RiskAssessments).HasConstraintName("FK_risk_assessments_policies");
 
@@ -256,7 +256,7 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.IsActive).HasDefaultValue(true);
 
             entity.HasOne(d => d.Agent).WithMany(p => p.Users).HasConstraintName("FK_users_agents");

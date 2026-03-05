@@ -7,7 +7,20 @@ using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
+using BrokerSystem.Api.Common.Endpoints;
+
 namespace BrokerSystem.Api.Features.Policies.CreatePolicy;
+
+public class CreatePolicyEndpoint : IEndpointDefinition
+{
+    public void MapEndpoints(IEndpointRouteBuilder app)
+    {
+        app.MapPost("api/policies", async (CreatePolicyCommand command, IMediator mediator) => 
+            Results.Ok(await mediator.Send(command)))
+            .WithName("CreatePolicy")
+            .WithTags("Policies");
+    }
+}
 
 public record CreatePolicyCommand(
     string PolicyNumber,
