@@ -2,8 +2,8 @@ using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using Dapper;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-
 using BrokerSystem.Api.Common.Endpoints;
+using BrokerSystem.Api.Common.Auth;
 
 namespace BrokerSystem.Api.Features.Clients.GetClientsStats;
 
@@ -11,8 +11,8 @@ public class GetClientsStatsEndpoint : IEndpointDefinition
 {
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
-        app.MapGet("api/clients/stats", async (IMediator mediator) => 
-            Results.Ok(await mediator.Send(new GetClientsStatsQuery())))
+        app.MapGet("api/clients/stats", async (IMediator mediator) =>
+                Results.Ok(await mediator.Send(new GetClientsStatsQuery())))
             .WithName("GetClientsStats")
             .WithTags("Clients");
     }
@@ -32,33 +32,53 @@ public record ClientsStatsDto
     public int NewClientsThisMonth { get; init; }
 }
 
-public class GetClientsStatsHandler(BrokerSystemDbContext db) : IRequestHandler<GetClientsStatsQuery, ClientsStatsDto>
+public class GetClientsStatsHandler(BrokerSystemDbContext db, ICurrentUserService currentUserService)
+    : IRequestHandler<GetClientsStatsQuery, ClientsStatsDto>
 {
-    public const string GetStatsSql = @"
-            SELECT 
-                (SELECT COUNT(*) FROM clients) as TotalClients,
-                (SELECT COUNT(*) FROM clients c JOIN client_types ct ON c.client_type_id = ct.client_type_id WHERE ct.type_name = 'VIP') as VipClients,
-                (SELECT COUNT(*) FROM clients c JOIN client_types ct ON c.client_type_id = ct.client_type_id WHERE ct.type_name = 'Corporate') as CorporateClients,
-                (SELECT COUNT(*) FROM policies p JOIN policy_statuses ps ON p.status_id = ps.status_id WHERE ps.is_active_policy = 1) as ActivePoliciesTotal,
-                (SELECT COUNT(*) FROM clients WHERE registration_date >= @StartOfMonth) as NewClientsThisMonth";
-
     public async Task<ClientsStatsDto> Handle(GetClientsStatsQuery request, CancellationToken cancellationToken)
     {
         using var connection = db.Database.GetDbConnection();
-        var startOfMonth = CalculateStartOfMonth(DateTime.Today);
+        if (connection.State != System.Data.ConnectionState.Open)
+            await connection.OpenAsync(cancellationToken);
 
-        var stats = await connection.QuerySingleOrDefaultAsync<ClientsStatsDto>(GetStatsSql, new { StartOfMonth = startOfMonth });
+        var startOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
 
-        return MapResult(stats);
+        int? effectiveAgentId = null;
+        var whereClause = "";
+        var policyFilter = "";
+
+        if (!currentUserService.IsAdmin)
+        {
+            if (currentUserService.IsAgent)
+            {
+                // Agenci widzą tylko statystyki swoich klientów i polis
+                effectiveAgentId = currentUserService.AgentId;
+                whereClause =
+                    "WHERE EXISTS (SELECT 1 FROM policies p WHERE p.client_id = c.client_id AND p.agent_id = @AgentId)";
+                policyFilter = "AND agent_id = @AgentId";
+            }
+            else
+            {
+                // Użytkownicy bez przypisanej roli agenta/admina nie widzą nic
+                whereClause = "WHERE 1=0";
+                policyFilter = "AND 1=0";
+            }
+        }
+
+        var sql = $@"
+            SELECT 
+                COUNT(*) AS TotalClients,
+                COUNT(CASE WHEN ct.type_name = 'VIP' THEN 1 END) AS VipClients,
+                COUNT(CASE WHEN ct.type_name = 'Corporate' THEN 1 END) AS CorporateClients,
+                COUNT(CASE WHEN c.registration_date >= @StartOfMonth THEN 1 END) AS NewClientsThisMonth,
+                (SELECT COUNT(*) FROM policies p JOIN policy_statuses ps ON p.status_id = ps.status_id WHERE ps.is_active_policy = 1 {policyFilter}) AS ActivePoliciesTotal
+            FROM clients c
+            JOIN client_types ct ON c.client_type_id = ct.client_type_id
+            {whereClause}";
+
+        var parameters = new { StartOfMonth = startOfMonth, AgentId = effectiveAgentId };
+        var stats = await connection.QuerySingleOrDefaultAsync<ClientsStatsDto>(sql, parameters);
+
+        return stats ?? new ClientsStatsDto();
     }
-
-    /// <summary>
-    /// Pure logic to calculate the first day of the current month.
-    /// </summary>
-    public static DateTime CalculateStartOfMonth(DateTime date) => new DateTime(date.Year, date.Month, 1);
-
-    /// <summary>
-    /// Pure logic to ensure a non-null response.
-    /// </summary>
-    public static ClientsStatsDto MapResult(ClientsStatsDto? stats) => stats ?? new ClientsStatsDto();
 }

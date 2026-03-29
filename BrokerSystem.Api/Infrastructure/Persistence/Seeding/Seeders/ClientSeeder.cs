@@ -149,13 +149,13 @@ public class ClientSeeder
             emailContact.IsPrimary = true;
             contacts.Add(emailContact);
 
-            // Telefon (primary dla 70% klientów)
+            // Telefon (zawsze nie-primary, bo email jest primary)
             if (_faker.Random.Bool(0.9f)) // 90% ma telefon
             {
                 var phoneContact = BogusConfiguration.GetClientContactFaker(client.ClientId).Generate();
                 phoneContact.ContactType = "mobile";
                 phoneContact.ContactValue = $"+48 {_faker.Random.Number(500, 799)} {_faker.Random.Number(100, 999)} {_faker.Random.Number(100, 999)}";
-                phoneContact.IsPrimary = _faker.Random.Bool(0.7f);
+                phoneContact.IsPrimary = false; // Fix: Only one can be primary!
                 contacts.Add(phoneContact);
             }
 

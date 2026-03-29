@@ -1,3 +1,4 @@
+using BrokerSystem.Api.Common.Auth;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Common.Caching;
 using BrokerSystem.Api.Infrastructure.Persistence;
@@ -17,14 +18,15 @@ public class GetDashboardStatsEndpoint : IEndpointDefinition
         app.MapGet("api/dashboard/stats", async (IMediator mediator) => 
             Results.Ok(await mediator.Send(new GetDashboardStatsQuery())))
             .WithName("GetDashboardStats")
-            .WithTags("Dashboard");
+            .WithTags("Dashboard")
+            .RequireAuthorization(p => p.RequireRole("Admin"));
     }
 }
 
 /// <summary>
 /// Query to retrieve aggregated dashboard statistics, including sales trends and distribution charts.
 /// </summary>
-public record GetDashboardStatsQuery() : IRequest<DashboardStatsResponse>;
+public record GetDashboardStatsQuery() : IRequest<DashboardStatsResponse>, IAuthorizeableRequest;
 
 public class DashboardStatsResponse
 {
@@ -61,21 +63,31 @@ public class DashboardKpis
     public decimal TotalPremiumVolume { get; set; }
 }
 
-public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService cache) : IRequestHandler<GetDashboardStatsQuery, DashboardStatsResponse>
+public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService cache, ICurrentUserService currentUserService) 
+    : IRequestHandler<GetDashboardStatsQuery, DashboardStatsResponse>
 {
-    private const string CacheKey = "DashboardStats";
+    private string GetCacheKey() => currentUserService.IsAdmin 
+        ? "DashboardStats_Admin" 
+        : $"DashboardStats_Agent_{currentUserService.AgentId ?? 0}";
 
     /// <summary>
-    /// Builds the multi-result SQL query for dashboard statistics.
+    /// Builds the multi-result SQL query for dashboard statistics, optionally filtered by agent.
     /// </summary>
-    public static string GetDashboardStatsSql(ISqlDialect sqlDialect) => $@"
-                -- Monthly Sales (Cross-platform version)
+    public static string GetDashboardStatsSql(ISqlDialect sqlDialect, int? agentId) 
+    {
+        var agentFilter = agentId.HasValue ? " AND agent_id = @AgentId" : "";
+        var clientAgentFilter = agentId.HasValue 
+            ? " WHERE EXISTS (SELECT 1 FROM policies p2 WHERE p2.client_id = c.client_id AND p2.agent_id = @AgentId)" 
+            : "";
+
+        return $@"
+                -- Monthly Sales
                 SELECT 
                     {sqlDialect.FormattedMonthYear("start_date")} as Month, 
                     COALESCE(SUM(premium_amount), 0) as TotalPremium, 
                     COUNT(*) as PolicyCount
                 FROM policies
-                WHERE start_date >= @StartDateLimit
+                WHERE start_date >= @StartDateLimit {agentFilter}
                 GROUP BY {sqlDialect.Year("start_date")}, {sqlDialect.Month("start_date")}
                 ORDER BY {sqlDialect.Year("start_date")}, {sqlDialect.Month("start_date")};
 
@@ -83,6 +95,7 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
                 SELECT ct.type_name as ClientType, COUNT(*) as ClientCount
                 FROM clients c
                 JOIN client_types ct ON c.client_type_id = ct.client_type_id
+                {clientAgentFilter}
                 GROUP BY ct.type_name
                 ORDER BY ClientCount DESC;
 
@@ -90,29 +103,36 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
                 SELECT ps.status_name as PolicyStatus, COUNT(*) as PolicyCount
                 FROM policies p
                 JOIN policy_statuses ps ON p.status_id = ps.status_id
+                WHERE 1=1 {agentFilter}
                 GROUP BY ps.status_name
                 ORDER BY PolicyCount DESC;
 
-                -- KPIs (1 Roundtrip)
+                -- KPIs
                 SELECT 
-                    (SELECT COUNT(*) FROM clients) as TotalClients,
-                    (SELECT COUNT(*) FROM policies) as TotalPolicies,
-                    10 as ActiveClaims,
-                    COALESCE((SELECT SUM(premium_amount) FROM policies), 0) as TotalPremiumVolume;
+                    (SELECT COUNT(*) FROM clients c {clientAgentFilter}) as TotalClients,
+                    (SELECT COUNT(*) FROM policies WHERE 1=1 {agentFilter}) as TotalPolicies,
+                    (SELECT COUNT(*) FROM claims cl JOIN policies p ON cl.policy_id = p.policy_id WHERE 1=1 {agentFilter}) as ActiveClaims,
+                    COALESCE((SELECT SUM(premium_amount) FROM policies WHERE 1=1 {agentFilter}), 0) as TotalPremiumVolume;
             ";
+    }
 
     public async Task<DashboardStatsResponse> Handle(GetDashboardStatsQuery request, CancellationToken ct)
     {
-        return await cache.GetOrCreateAsync(CacheKey, async () =>
+        return await cache.GetOrCreateAsync(GetCacheKey(), async () =>
         {
             using var connection = db.Database.GetDbConnection();
             
             var sqlDialect = db.Database.Sql();
             var startDateLimit = CalculateStartDateLimit(DateTime.Today);
+            var agentId = currentUserService.IsAdmin ? null : currentUserService.AgentId;
 
-            var sql = GetDashboardStatsSql(sqlDialect);
+            var sql = GetDashboardStatsSql(sqlDialect, agentId);
 
-            using var multi = await connection.QueryMultipleAsync(sql, new { StartDateLimit = startDateLimit });
+            using var multi = await connection.QueryMultipleAsync(sql, new 
+            { 
+                StartDateLimit = startDateLimit,
+                AgentId = agentId
+            });
 
             var monthlySales = (await multi.ReadAsync<MonthlySales>()).ToList();
             var clientTypes = (await multi.ReadAsync<ClientTypeDistribution>()).ToList();
@@ -129,10 +149,8 @@ public class GetDashboardStatsHandler(BrokerSystemDbContext db, ICacheService ca
         }, TimeSpan.FromMinutes(10));
     }
 
-    /// <summary>
-    /// Pure logic to calculate the start date for a 12-month trailing window.
-    /// </summary>
     public static DateTime CalculateStartDateLimit(DateTime today) => 
         new DateTime(today.Year, today.Month, 1).AddMonths(-11);
 }
+
 

@@ -205,11 +205,11 @@ public class DictionarySeeder
 
         var roles = new List<Role>
         {
-            new() { RoleName = "admin" },
-            new() { RoleName = "agent" },
-            new() { RoleName = "underwriter" },
-            new() { RoleName = "manager" },
-            new() { RoleName = "viewer" }
+            new() { RoleName = "Admin" },
+            new() { RoleName = "Agent" },
+            new() { RoleName = "Underwriter" },
+            new() { RoleName = "Manager" },
+            new() { RoleName = "Viewer" }
         };
 
         await _context.Roles.AddRangeAsync(roles);

@@ -160,9 +160,9 @@ public class AgentSeeder
     private async Task SeedUsersForAgentsAsync(List<Agent> agents)
     {
         var users = new List<User>();
-        var adminRole = await _context.Roles.FirstAsync(r => r.RoleName == "admin");
-        var managerRole = await _context.Roles.FirstAsync(r => r.RoleName == "manager");
-        var agentRole = await _context.Roles.FirstAsync(r => r.RoleName == "agent");
+        var adminRole = await _context.Roles.FirstAsync(r => r.RoleName == "Admin");
+        var managerRole = await _context.Roles.FirstAsync(r => r.RoleName == "Manager");
+        var agentRole = await _context.Roles.FirstAsync(r => r.RoleName == "Agent");
 
         foreach (var agent in agents)
         {
