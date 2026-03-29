@@ -1,3 +1,4 @@
+using BrokerSystem.Api.Common.Auth;
 using BrokerSystem.Api.Common.Exceptions;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Infrastructure.Persistence;
@@ -26,10 +27,11 @@ public class ExportPolicyEndpoint : IEndpointDefinition
     }
 }
 
-public record ExportPolicyQuery(int PolicyId) : IRequest<byte[]>;
+public record ExportPolicyQuery(int PolicyId) : IRequest<byte[]>, IAuthorizeableRequest;
 
 public class PolicyExportDto
 {
+    public int AgentId { get; set; } // Added for security check
     public string PolicyNumber { get; set; } = string.Empty;
     public string ClientFirstName { get; set; } = string.Empty;
     public string ClientLastName { get; set; } = string.Empty;
@@ -43,13 +45,15 @@ public class PolicyExportDto
     public string AgentName { get; set; } = string.Empty;
 }
 
-public class ExportPolicyHandler(BrokerSystemDbContext db) : IRequestHandler<ExportPolicyQuery, byte[]>
+public class ExportPolicyHandler(BrokerSystemDbContext db, ICurrentUserService currentUserService) 
+    : IRequestHandler<ExportPolicyQuery, byte[]>
 {
     /// <summary>
     /// Builds the SQL query for policy export, joining clients, types, statuses, and agents.
     /// </summary>
     public static string GetExportSql(ISqlDialect sqlDialect) => $@"
             SELECT 
+                p.agent_id AS AgentId,
                 p.policy_number AS PolicyNumber,
                 c.first_name AS ClientFirstName,
                 c.last_name AS ClientLastName,
@@ -80,6 +84,15 @@ public class ExportPolicyHandler(BrokerSystemDbContext db) : IRequestHandler<Exp
         if (policyDto == null)
         {
             throw new NotFoundException($"Polisa o ID {request.PolicyId} nie została znaleziona.");
+        }
+
+        // Data Isolation: If user is an agent, they can only export their own policies
+        if (!currentUserService.IsAdmin && currentUserService.AgentId.HasValue)
+        {
+            if (policyDto.AgentId != currentUserService.AgentId.Value)
+            {
+                throw new ForbidException("You do not have permission to export this policy.");
+            }
         }
 
         var document = new PolicyDocument(policyDto);
@@ -191,3 +204,4 @@ public class PolicyDocument(PolicyExportDto policy) : IDocument
         });
     }
 }
+

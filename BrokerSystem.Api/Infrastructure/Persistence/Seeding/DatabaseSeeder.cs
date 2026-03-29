@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace BrokerSystem.Api.Infrastructure.Persistence.Seeding;
 
 /// <summary>
-/// Główny orchestrator seedowania bazy danych
-/// Wykonuje seedowanie w odpowiedniej kolejności (warstwy zależności)
+/// Main orchestrator for database seeding.
+/// Executes seeders in the correct dependency order.
 /// </summary>
 public class DatabaseSeeder
 {
@@ -20,7 +20,7 @@ public class DatabaseSeeder
     }
 
     /// <summary>
-    /// Główna metoda seedująca - wykonuje wszystko w odpowiedniej kolejności
+    /// Main seeding method - executes all seeders in the correct sequence.
     /// </summary>
     public async Task SeedAllAsync(bool resetDatabase = false)
     {
@@ -29,44 +29,49 @@ public class DatabaseSeeder
 
         try
         {
-            // Opcjonalnie: wyczyść bazę
+            // Optional: clear database
             if (resetDatabase)
             {
                 _logger.LogWarning("UWAGA: Czyszczenie bazy danych...");
                 await ClearDatabaseAsync();
             }
 
-            // WARSTWA 0: Słowniki (zero zależności)
+            // LAYER 0: Dictionaries (zero dependencies)
             _logger.LogInformation("WARSTWA 0: Seedowanie słowników...");
             var dictionarySeeder = new DictionarySeeder(_context, _logger);
             await dictionarySeeder.SeedAsync();
 
-            // WARSTWA 1: Klienci
+            // LAYER 1: Clients
             _logger.LogInformation("WARSTWA 1: Seedowanie klientów...");
             var clientSeeder = new ClientSeeder(_context, _logger);
             await clientSeeder.SeedAsync(2000); // 2000 klientów
 
-            // WARSTWA 2: Agenci (hierarchia!)
+            // LAYER 2: Agents (hierarchy!)
             _logger.LogInformation("WARSTWA 2: Seedowanie agentów (hierarchia)...");
             var agentSeeder = new AgentSeeder(_context, _logger);
             await agentSeeder.SeedAsync(100); // 100 agentów
 
-            // WARSTWA 3: Polisy (GŁÓWNA TABELA)
+            // LAYER 3: Policies (MAIN TABLE)
             _logger.LogInformation("WARSTWA 3: Seedowanie polis...");
             var policySeeder = new PolicySeeder(_context, _logger);
             await policySeeder.SeedAsync(5000); // 5000 polis
 
-            // WARSTWA 4: Roszczenia
+            // LAYER 4: Claims
             _logger.LogInformation("WARSTWA 4: Seedowanie roszczeń...");
             var claimSeeder = new ClaimSeeder(_context, _logger);
             await claimSeeder.SeedAsync(800); // 800 szkód
 
-            // WARSTWA 5: Finanse
+            // LAYER 5: Finance
             _logger.LogInformation("WARSTWA 5: Seedowanie finansów...");
             var financialSeeder = new FinancialSeeder(_context, _logger);
             await financialSeeder.SeedAsync();
 
-            // Raport końcowy
+            // LAYER 6: Static Demo Users
+            _logger.LogInformation("WARSTWA 6: Seedowanie użytkowników demo...");
+            var userSeeder = new UserSeeder(_context, _logger);
+            await userSeeder.SeedAsync();
+
+            // Final report
             var duration = DateTime.Now - startTime;
             _logger.LogInformation("=== SEEDOWANIE ZAKOŃCZONE POMYŚLNIE ===");
             _logger.LogInformation($"Czas wykonania: {duration.TotalSeconds:F2} sekund");
@@ -80,16 +85,18 @@ public class DatabaseSeeder
     }
 
     /// <summary>
-    /// Czyści całą bazę danych (DELETE wszystkich rekordów)
-    /// UWAGA: Tylko do developmentu!
+    /// Clears the entire database (DELETE all records).
+    /// WARNING: For development use only!
     /// </summary>
     private async Task ClearDatabaseAsync()
     {
-        await _context.Database.ExecuteSqlRawAsync("EXEC sp_MSForEachTable 'SET QUOTED_IDENTIFIER ON; ALTER TABLE ? NOCHECK CONSTRAINT ALL'");
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC sp_MSForEachTable 'SET QUOTED_IDENTIFIER ON; ALTER TABLE ? NOCHECK CONSTRAINT ALL'");
         await _context.Database.ExecuteSqlRawAsync("EXEC sp_MSForEachTable 'SET QUOTED_IDENTIFIER ON; DELETE FROM ?'");
-        await _context.Database.ExecuteSqlRawAsync("EXEC sp_MSForEachTable 'SET QUOTED_IDENTIFIER ON; ALTER TABLE ? CHECK CONSTRAINT ALL'");
+        await _context.Database.ExecuteSqlRawAsync(
+            "EXEC sp_MSForEachTable 'SET QUOTED_IDENTIFIER ON; ALTER TABLE ? CHECK CONSTRAINT ALL'");
 
-        // Resetuj IDENTITY
+        // Reset IDENTITY
         await _context.Database.ExecuteSqlRawAsync(@"
             EXEC sp_MSForEachTable 'SET QUOTED_IDENTIFIER ON; IF OBJECTPROPERTY(OBJECT_ID(''?''), ''TableHasIdentity'') = 1 
             DBCC CHECKIDENT (''?'', RESEED, 0)'
@@ -99,7 +106,7 @@ public class DatabaseSeeder
     }
 
     /// <summary>
-    /// Wyświetla statystyki bazy danych po seedowaniu
+    /// Logs database statistics after seeding.
     /// </summary>
     private async Task LogDatabaseStatisticsAsync()
     {
@@ -108,7 +115,8 @@ public class DatabaseSeeder
         _logger.LogInformation($"  - B2C: {await _context.Clients.CountAsync(c => c.ClientType.TypeName == "B2C")}");
         _logger.LogInformation($"  - B2B: {await _context.Clients.CountAsync(c => c.ClientType.TypeName == "B2B")}");
         _logger.LogInformation($"  - VIP: {await _context.Clients.CountAsync(c => c.ClientType.TypeName == "VIP")}");
-        _logger.LogInformation($"  - Corporate: {await _context.Clients.CountAsync(c => c.ClientType.TypeName == "Corporate")}");
+        _logger.LogInformation(
+            $"  - Corporate: {await _context.Clients.CountAsync(c => c.ClientType.TypeName == "Corporate")}");
 
         _logger.LogInformation($"Adresy: {await _context.ClientAddresses.CountAsync()}");
         _logger.LogInformation($"Kontakty: {await _context.ClientContacts.CountAsync()}");

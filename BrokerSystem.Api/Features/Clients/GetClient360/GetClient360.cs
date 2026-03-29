@@ -1,12 +1,12 @@
+using BrokerSystem.Api.Common.Auth;
+using BrokerSystem.Api.Common.Endpoints;
 using BrokerSystem.Api.Common.Exceptions;
 using BrokerSystem.Api.Infrastructure.Persistence.Context;
+using Dapper;
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
-using FluentValidation;
-using Dapper;
 using System.Data;
-
-using BrokerSystem.Api.Common.Endpoints;
 
 namespace BrokerSystem.Api.Features.Clients.GetClient360;
 
@@ -14,8 +14,8 @@ public class GetClient360Endpoint : IEndpointDefinition
 {
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
-        app.MapGet("api/clients/{id:int}/360", async (int id, IMediator mediator) => 
-            Results.Ok(await mediator.Send(new GetClient360Query(id))))
+        app.MapGet("api/clients/{id:int}/360", async (int id, IMediator mediator) =>
+                Results.Ok(await mediator.Send(new GetClient360Query(id))))
             .WithName("GetClient360")
             .WithTags("Clients");
     }
@@ -24,7 +24,7 @@ public class GetClient360Endpoint : IEndpointDefinition
 /// <summary>
 /// Query to retrieve a comprehensive 360-degree view of a client, including contacts, addresses, policies, and claims.
 /// </summary>
-public record GetClient360Query(int ClientId) : IRequest<Client360Dto?>;
+public record GetClient360Query(int ClientId) : IRequest<Client360Dto?>, IAuthorizeableRequest;
 
 public class GetClient360Validator : AbstractValidator<GetClient360Query>
 {
@@ -43,7 +43,7 @@ public record Client360Dto
     public string? TaxId { get; init; }
     public DateOnly RegistrationDate { get; init; }
     public string? ClientType { get; init; }
-    
+
     public List<Client360ContactDto> Contacts { get; init; } = [];
     public List<Client360AddressDto> Addresses { get; init; } = [];
     public List<Client360PolicyDto> Policies { get; init; } = [];
@@ -86,19 +86,46 @@ public record Client360ClaimDto
     public DateOnly IncidentDate { get; init; }
 }
 
-public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<GetClient360Query, Client360Dto?>
+public class GetClient360Handler(BrokerSystemDbContext db, ICurrentUserService currentUserService)
+    : IRequestHandler<GetClient360Query, Client360Dto?>
 {
     public async Task<Client360Dto?> Handle(GetClient360Query request, CancellationToken cancellationToken)
     {
         using var connection = db.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+            await connection.OpenAsync(cancellationToken);
 
-        using var multi = await connection.QueryMultipleAsync(GetMainSql, new { Id = request.ClientId });
-        
-        var client = await multi.ReadFirstOrDefaultAsync<Client360Dto>();
-        if (client == null)
+        // 1. Check if client exists and if user has access to the data
+        var accessCheckSql = @"
+            SELECT 
+                CAST(CASE WHEN EXISTS(SELECT 1 FROM clients WHERE client_id = @Id) THEN 1 ELSE 0 END AS BIT) AS ClientExists,
+                CAST(CASE WHEN EXISTS(SELECT 1 FROM policies WHERE client_id = @Id AND agent_id = @AgentId) THEN 1 ELSE 0 END AS BIT) AS HasAccess";
+
+        var (clientExists, hasAccess) = await connection.QuerySingleAsync<(bool clientExists, bool hasAccess)>(
+            accessCheckSql,
+            new { Id = request.ClientId, AgentId = currentUserService.AgentId ?? 0 });
+
+        if (!clientExists)
         {
-            throw new NotFoundException($"Klient o ID {request.ClientId} nie został znaleziony.");
+            throw new NotFoundException($"Klient o ID {request.ClientId} nie istnieje w systemie.");
         }
+
+        if (!currentUserService.IsAdmin && !hasAccess)
+        {
+            throw new ForbidException("Nie masz uprawnień do przeglądania danych tego klienta.");
+        }
+
+        // 2. Pobierz pełne dane widoku 360
+        using var multi = await connection.QueryMultipleAsync(GetMainSql,
+            new
+            {
+                Id = request.ClientId,
+                AgentId = currentUserService.AgentId ?? 0,
+                IsAdmin = currentUserService.IsAdmin ? 1 : 0
+            });
+
+        var client = await multi.ReadFirstOrDefaultAsync<Client360Dto>();
+        if (client == null) throw new NotFoundException("Błąd podczas pobierania danych klienta.");
 
         var contacts = await multi.ReadAsync<Client360ContactDto>();
         var addresses = await multi.ReadAsync<Client360AddressDto>();
@@ -129,13 +156,16 @@ public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<Get
             FROM policies p
             JOIN policy_types pt ON p.policy_type_id = pt.policy_type_id
             JOIN policy_statuses ps ON p.status_id = ps.status_id
-            WHERE p.client_id = @Id;
+            WHERE p.client_id = @Id AND (@IsAdmin = 1 OR p.agent_id = @AgentId);
 
             SELECT cl.claim_id AS ClaimId, cl.claim_number AS ClaimNumber, cs.status_name AS Status, 
                    cl.approved_amount AS ApprovedAmount, cl.incident_date AS IncidentDate, cl.policy_id AS PolicyId
             FROM claims cl
             JOIN claim_statuses cs ON cl.status_id = cs.status_id
-            WHERE cl.policy_id IN (SELECT policy_id FROM policies WHERE client_id = @Id);
+            WHERE cl.policy_id IN (
+                SELECT policy_id FROM policies 
+                WHERE client_id = @Id AND (@IsAdmin = 1 OR agent_id = @AgentId)
+            );
         ";
 
     /// <summary>
@@ -158,24 +188,32 @@ public class GetClient360Handler(BrokerSystemDbContext db) : IRequestHandler<Get
             PremiumAmount = p.PremiumAmount,
             StartDate = p.StartDate,
             EndDate = p.EndDate,
-            Claims = claimsLookup[p.PolicyId].Select(c => new Client360ClaimDto 
-            { 
-                ClaimId = c.ClaimId, 
-                ClaimNumber = c.ClaimNumber, 
-                Status = c.Status, 
-                ApprovedAmount = c.ApprovedAmount, 
-                IncidentDate = c.IncidentDate 
+            Claims = claimsLookup[p.PolicyId].Select(c => new Client360ClaimDto
+            {
+                ClaimId = c.ClaimId,
+                ClaimNumber = c.ClaimNumber,
+                Status = c.Status,
+                ApprovedAmount = c.ApprovedAmount,
+                IncidentDate = c.IncidentDate
             }).ToList()
         }).ToList();
 
-        return client with 
-        { 
-            Contacts = contacts.OrderByDescending(c => c.IsPrimary).ToList(), 
-            Addresses = addresses.OrderByDescending(a => a.IsCurrent).ToList(), 
-            Policies = finalPolicies 
+        return client with
+        {
+            Contacts = contacts.OrderByDescending(c => c.IsPrimary).ToList(),
+            Addresses = addresses.OrderByDescending(a => a.IsCurrent).ToList(),
+            Policies = finalPolicies
         };
     }
 
-    public record Client360PolicyDtoInternal : Client360PolicyDto { public new int PolicyId { get; init; } }
-    public record Client360ClaimDtoInternal : Client360ClaimDto { public int PolicyId { get; init; } }
+    public record Client360PolicyDtoInternal : Client360PolicyDto
+    {
+        public new int PolicyId { get; init; }
+    }
+
+    public record Client360ClaimDtoInternal : Client360ClaimDto
+    {
+        public int PolicyId { get; init; }
+    }
 }
+

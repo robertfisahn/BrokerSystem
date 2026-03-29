@@ -1,10 +1,10 @@
-﻿using BrokerSystem.Api.Infrastructure.Persistence.Context;
+﻿using BrokerSystem.Api.Common.Auth;
+using BrokerSystem.Api.Infrastructure.Persistence.Context;
 using BrokerSystem.Api.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using FluentValidation;
 using Dapper;
-
 using BrokerSystem.Api.Common.Endpoints;
 
 namespace BrokerSystem.Api.Features.Policies.GetPolicies;
@@ -13,7 +13,7 @@ public class GetPoliciesEndpoint : IEndpointDefinition
 {
     public void MapEndpoints(IEndpointRouteBuilder app)
     {
-        app.MapGet("api/policies", async (IMediator mediator, [AsParameters] GetPoliciesQuery query) => 
+        app.MapGet("api/policies", async (IMediator mediator, [AsParameters] GetPoliciesQuery query) =>
             Results.Ok(await mediator.Send(query)))
             .WithName("GetPolicies")
             .WithTags("Policies");
@@ -28,14 +28,15 @@ public record GetPoliciesQuery(
     int PageSize = 20,
     string? Search = null,
     string? SortBy = null,
-    bool SortDescending = false) : IRequest<PagedPoliciesResponse>;
+    bool SortDescending = false) : IRequest<PagedPoliciesResponse>, IAuthorizeableRequest;
 
 public class GetPoliciesValidator : AbstractValidator<GetPoliciesQuery>
 {
     public GetPoliciesValidator()
     {
-        RuleFor(x => x.Page).GreaterThan(0).WithMessage("Page must be at least 1.");
-        RuleFor(x => x.PageSize).InclusiveBetween(1, 100).WithMessage("PageSize must be between 1 and 100.");
+        RuleFor(x => x.Page).GreaterThan(0).WithMessage("Numer strony musi być większy od 0.");
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100)
+            .WithMessage("Liczba elementów na stronie musi mieścić się w przedziale 1-100.");
     }
 }
 
@@ -57,15 +58,16 @@ public class PolicyDto
     public string Status { get; set; } = string.Empty;
 }
 
-public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetPoliciesQuery, PagedPoliciesResponse>
+public class GetPoliciesHandler(BrokerSystemDbContext db, ICurrentUserService currentUserService)
+    : IRequestHandler<GetPoliciesQuery, PagedPoliciesResponse>
 {
     public async Task<PagedPoliciesResponse> Handle(GetPoliciesQuery request, CancellationToken ct)
     {
         using var connection = db.Database.GetDbConnection();
         var sqlDialect = db.Database.Sql();
 
-        // 1. Logic Isolation: Build statement based on Search
-        var (whereClause, parameters) = BuildFilterQuery(request.Search);
+        // 1. Logic Isolation: Build statement based on Search and Auth
+        var (whereClause, parameters) = BuildFilterQuery(request.Search, currentUserService);
 
         // 2. Count Query
         var countSql = $@"
@@ -73,7 +75,7 @@ public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetP
             FROM policies p
             INNER JOIN clients c ON p.client_id = c.client_id
             {whereClause}";
-            
+
         var totalCount = await connection.ExecuteScalarAsync<int>(countSql, parameters);
 
         // 3. Logic Isolation: Sorting logic
@@ -91,12 +93,21 @@ public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetP
     }
 
     /// <summary>
-    /// Builds the SQL WHERE clause for policy filtering based on a search term.
+    /// Builds the SQL WHERE clause for policy filtering based on a search term and agent isolation.
     /// </summary>
-    public static (string WhereClause, DynamicParameters Parameters) BuildFilterQuery(string? search)
+    public static (string WhereClause, DynamicParameters Parameters) BuildFilterQuery(string? search,
+        ICurrentUserService currentUserService)
     {
         var whereClause = "WHERE 1=1";
         var parameters = new DynamicParameters();
+
+        // Data isolation / Security: 
+        // Only Agents can access their own policies. This is a role-specific permission.
+        if (currentUserService.AgentId.HasValue)
+        {
+            whereClause += " AND p.agent_id = @AgentId";
+            parameters.Add("@AgentId", currentUserService.AgentId.Value);
+        }
 
         if (string.IsNullOrWhiteSpace(search))
         {
@@ -107,7 +118,8 @@ public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetP
         for (int i = 0; i < searchWords.Length; i++)
         {
             var pName = $"@p{i}";
-            whereClause += $" AND (p.policy_number LIKE {pName} OR c.first_name LIKE {pName} OR c.last_name LIKE {pName})";
+            whereClause +=
+                $" AND (p.policy_number LIKE {pName} OR c.first_name LIKE {pName} OR c.last_name LIKE {pName})";
             parameters.Add(pName, $"%{searchWords[i]}%");
         }
 
@@ -127,7 +139,7 @@ public class GetPoliciesHandler(BrokerSystemDbContext db) : IRequestHandler<GetP
             "status" => "ps.status_name",
             _ => "p.created_at"
         };
-        
+
         return orderBy + (sortDescending ? " DESC" : " ASC");
     }
 

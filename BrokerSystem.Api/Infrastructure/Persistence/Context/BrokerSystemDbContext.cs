@@ -60,6 +60,8 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
     public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<UserRole> UserRoles { get; set; }
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+    public virtual DbSet<UserActivity> UserActivities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -267,6 +269,26 @@ public partial class BrokerSystemDbContext(DbContextOptions<BrokerSystemDbContex
             entity.HasOne(d => d.Role).WithMany(p => p.UserRoles).HasConstraintName("FK_user_roles_roles");
 
             entity.HasOne(d => d.User).WithMany(p => p.UserRoles).HasConstraintName("FK_user_roles_users");
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasIndex(e => e.Token, "UQ_refresh_tokens").IsUnique();
+
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_refresh_tokens_users");
+        });
+
+        modelBuilder.Entity<UserActivity>(entity =>
+        {
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.UserActivities)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_user_activities_users");
         });
 
         OnModelCreatingPartial(modelBuilder);

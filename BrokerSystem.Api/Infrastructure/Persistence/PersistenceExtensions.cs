@@ -15,6 +15,8 @@ public interface ISqlDialect
     string Year(string column);
     string Month(string column);
     string FormattedMonthYear(string column);
+    string IsNull(string expression, string defaultValue);
+    string DateDiffDay(string start, string end);
 }
 
 /// <summary>
@@ -24,13 +26,19 @@ public class SqlServerDialect : ISqlDialect
 {
     public string Top(int count) => $"TOP {count}";
     public string Limit(int count) => ""; // SQL Server uses TOP
-    public string Paging(string offsetParam, string pageSizeParam) 
+
+    public string Paging(string offsetParam, string pageSizeParam)
         => $"OFFSET {offsetParam} ROWS FETCH NEXT {pageSizeParam} ROWS ONLY";
+
     public string Concat(params string[] parts) => string.Join(" + ", parts);
     public string Year(string column) => $"YEAR({column})";
     public string Month(string column) => $"MONTH({column})";
-    public string FormattedMonthYear(string column) 
+
+    public string FormattedMonthYear(string column)
         => $"CAST(YEAR({column}) AS VARCHAR(4)) + '-' + RIGHT('0' + CAST(MONTH({column}) AS VARCHAR(2)), 2)";
+
+    public string IsNull(string expression, string defaultValue) => $"ISNULL({expression}, {defaultValue})";
+    public string DateDiffDay(string start, string end) => $"DATEDIFF(day, {start}, {end})";
 }
 
 /// <summary>
@@ -40,12 +48,17 @@ public class SqliteDialect : ISqlDialect
 {
     public string Top(int count) => ""; // SQLite uses LIMIT
     public string Limit(int count) => $"LIMIT {count}";
-    public string Paging(string offsetParam, string pageSizeParam) 
+
+    public string Paging(string offsetParam, string pageSizeParam)
         => $"LIMIT {pageSizeParam} OFFSET {offsetParam}";
+
     public string Concat(params string[] parts) => string.Join(" || ", parts);
     public string Year(string column) => $"strftime('%Y', {column})";
     public string Month(string column) => $"strftime('%m', {column})";
     public string FormattedMonthYear(string column) => $"strftime('%Y-%m', {column})";
+
+    public string IsNull(string expression, string defaultValue) => $"COALESCE({expression}, {defaultValue})";
+    public string DateDiffDay(string start, string end) => $"CAST(JULIANDAY({end}) - JULIANDAY({start}) AS INT)";
 }
 
 public static class DatabaseFacadeExtensions
