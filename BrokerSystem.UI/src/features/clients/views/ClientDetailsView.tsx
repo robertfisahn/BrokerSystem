@@ -209,7 +209,7 @@ export function ClientDetailsView() {
     )
 }
 
-function DetailItem({ icon, label, value, badge }: { icon: any, label: string, value: string, badge?: any }) {
+function DetailItem({ icon, label, value, badge }: { icon: React.ReactNode, label: string, value: string, badge?: React.ReactNode }) {
     return (
         <Group wrap="nowrap" align="start">
             <Text c="dimmed">{icon}</Text>

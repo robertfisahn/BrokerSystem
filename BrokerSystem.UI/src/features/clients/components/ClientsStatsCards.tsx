@@ -2,17 +2,20 @@ import { useQuery } from '@tanstack/react-query'
 import { SimpleGrid, Paper, Group, ThemeIcon, Text, Skeleton } from '@mantine/core'
 import { Users, Crown, Building2, CalendarPlus } from 'lucide-react'
 import { getClientsStats } from '../api/clientsApi'
-
-const statConfig = [
-    { key: 'totalClients', label: 'Wszyscy klienci', icon: Users, color: 'blue' },
-    { key: 'vipClients', label: 'Klienci VIP', icon: Crown, color: 'yellow' },
-    { key: 'corporateClients', label: 'Firmy', icon: Building2, color: 'violet' },
-    { key: 'newClientsThisMonth', label: 'Nowi w tym miesiącu', icon: CalendarPlus, color: 'green' },
-] as const
+import { useAuth } from '../../../providers/AuthProvider'
 
 export function ClientsStatsCards() {
+    const { isAgent } = useAuth();
+
+    const statConfig = [
+        { key: 'totalClients', label: isAgent ? 'Twoi klienci' : 'Wszyscy klienci', icon: Users, color: 'blue' },
+        { key: 'vipClients', label: 'Klienci VIP', icon: Crown, color: 'yellow' },
+        { key: 'corporateClients', label: 'Firmy', icon: Building2, color: 'violet' },
+        { key: 'newClientsThisMonth', label: 'Nowi w tym miesiącu', icon: CalendarPlus, color: 'green' },
+    ] as const;
+
     const { data: stats, isLoading } = useQuery({
-        queryKey: ['clients-stats'],
+        queryKey: ['clients-stats', isAgent ? 'agent' : 'admin'],
         queryFn: getClientsStats,
     })
 

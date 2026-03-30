@@ -5,6 +5,7 @@ import { useForm } from '@mantine/form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createPolicy, getPolicyLookups, CreatePolicyData } from '../api/policiesApi';
 import { notifications } from '@mantine/notifications';
+import { useAuth } from '../../../providers/AuthProvider';
 
 interface CreatePolicyModalProps {
     opened: boolean;
@@ -25,6 +26,7 @@ interface PolicyFormValues {
 
 const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ opened, onClose }) => {
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     const { data: lookups, isLoading: isLoadingLookups } = useQuery({
         queryKey: ['policyLookups'],
@@ -37,7 +39,7 @@ const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ opened, onClose }
             policyNumber: '',
             clientId: '',
             policyTypeId: '',
-            agentId: '',
+            agentId: user?.agentId?.toString() || '',
             premiumAmount: 0,
             sumInsured: 0,
             startDate: new Date(),
@@ -48,9 +50,11 @@ const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ opened, onClose }
             policyNumber: (value) => (value.length < 3 ? 'Numer polisy jest za krótki' : null),
             clientId: (value) => (!value ? 'Wybierz klienta' : null),
             policyTypeId: (value) => (!value ? 'Wybierz typ polisy' : null),
+            agentId: (value) => (!value ? 'Wybierz agenta' : null),
             premiumAmount: (value) => (value <= 0 ? 'Kwota musi być większa od 0' : null),
         },
     });
+
 
     const mutation = useMutation({
         mutationFn: createPolicy,
@@ -64,10 +68,11 @@ const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ opened, onClose }
             form.reset();
             onClose();
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
+            const axiosError = error as import('axios').AxiosError<{ message?: string }>;
             notifications.show({
                 title: 'Błąd',
-                message: error.response?.data?.message || 'Wystąpił błąd podczas tworzenia polisy',
+                message: axiosError.response?.data?.message || 'Wystąpił błąd podczas tworzenia polisy',
                 color: 'red',
             });
         },
@@ -159,15 +164,6 @@ const CreatePolicyModal: React.FC<CreatePolicyModalProps> = ({ opened, onClose }
                             {...form.getInputProps('endDate')}
                         />
                     </Group>
-
-                    <Select
-                        label="Agent"
-                        placeholder="Wybierz agenta"
-                        data={lookups?.agents.map(a => ({ value: a.id.toString(), label: a.name })) || []}
-                        required
-                        disabled={isLoadingLookups}
-                        {...form.getInputProps('agentId')}
-                    />
 
                     <Select
                         label="Częstotliwość Płatności"

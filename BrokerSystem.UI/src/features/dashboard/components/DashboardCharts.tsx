@@ -13,6 +13,7 @@ import {
     Legend
 } from 'recharts';
 import { MonthlySales, ClientTypeDistribution, PolicyStatusDistribution } from '../api/dashboardApi';
+import { MantineTheme } from '@mantine/core';
 
 interface DashboardChartsProps {
     monthlySales: MonthlySales[];
@@ -20,9 +21,22 @@ interface DashboardChartsProps {
     policyStatuses: PolicyStatusDistribution[];
 }
 
+interface PieTooltipPayloadEntry {
+    name: string;
+    value: number;
+    color: string;
+    payload: { fill: string };
+}
+
+interface CustomPieTooltipProps {
+    active?: boolean;
+    payload?: PieTooltipPayloadEntry[];
+    theme: MantineTheme;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-const CustomPieTooltip = ({ active, payload, theme }: any) => {
+const CustomPieTooltip = ({ active, payload, theme }: CustomPieTooltipProps) => {
     if (active && payload && payload.length) {
         const color = payload[0].payload.fill || payload[0].color;
 
@@ -50,9 +64,9 @@ const CustomPieTooltip = ({ active, payload, theme }: any) => {
 export function DashboardCharts({ monthlySales, clientTypes, policyStatuses }: DashboardChartsProps) {
     const theme = useMantineTheme();
 
-    const renderLegend = (value: string, entry: any) => {
-        const { payload } = entry;
-        const count = payload.clientCount || payload.policyCount;
+    const renderLegend = (value: string, entry: { payload?: Record<string, unknown> }) => {
+        const payload = entry.payload as Record<string, number> | undefined;
+        const count = payload?.clientCount || payload?.policyCount || 0;
         return <span style={{ color: theme.colors.dark[0], fontSize: '12px' }}>{value} ({count})</span>;
     };
 

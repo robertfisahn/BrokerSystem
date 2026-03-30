@@ -7,7 +7,10 @@ import { useDisclosure } from '@mantine/hooks'
 import CreatePolicyModal from '../components/CreatePolicyModal';
 import { PolicyPreviewModal } from '../components/PolicyPreviewModal';
 
+import { useAuth } from '../../../providers/AuthProvider';
+
 export function PoliciesDashboard() {
+    const { isAgent } = useAuth();
     const [opened, { open, close }] = useDisclosure(false);
     const [previewOpened, { open: openPreview, close: closePreview }] = useDisclosure(false);
     const [selectedPolicy, setSelectedPolicy] = useState<{ id: number, number: string } | null>(null);
@@ -36,9 +39,11 @@ export function PoliciesDashboard() {
                     </Title>
                     <Text c="dimmed">Przeglądaj i zarządzaj umowami ubezpieczeniowymi klientów.</Text>
                 </div>
-                <Button leftSection={<Plus size={18} />} variant="filled" onClick={open}>
-                    Nowa Polisa
-                </Button>
+                {isAgent && (
+                    <Button leftSection={<Plus size={18} />} variant="filled" onClick={open}>
+                        Nowa Polisa
+                    </Button>
+                )}
             </Group>
 
             <Card withBorder radius="md" p="md" mb="xl">
