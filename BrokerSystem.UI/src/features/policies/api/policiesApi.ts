@@ -1,4 +1,5 @@
 import apiClient from '../../../api/apiClient';
+import { PaginatedResult } from '../../../api/types';
 
 export interface PolicyListItem {
     policyId: number;
@@ -9,13 +10,6 @@ export interface PolicyListItem {
     startDate: string;
     endDate: string;
     status: string;
-}
-
-export interface PaginatedResult<T> {
-    items: T[];
-    totalCount: number;
-    page: number;
-    pageSize: number;
 }
 
 export interface GetPoliciesParams {

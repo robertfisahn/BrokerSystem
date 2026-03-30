@@ -34,3 +34,35 @@ export const getDashboardStats = async (): Promise<DashboardStatsResponse> => {
     const response = await apiClient.get<DashboardStatsResponse>('/dashboard/stats');
     return response.data;
 };
+
+// Agent Dashboard
+export interface AgentStats {
+    totalClients: number;
+    activePolicies: number;
+    totalPremium: number;
+}
+
+export interface ExpiringPolicy {
+    policyId: number;
+    policyNumber: string;
+    clientName: string;
+    endDate: string;
+    daysLeft: number;
+}
+
+export interface RecentActivity {
+    type: string;
+    description: string;
+    createdAt: string;
+}
+
+export interface AgentDashboardResponse {
+    stats: AgentStats;
+    expiringPolicies: ExpiringPolicy[];
+    recentActivities: RecentActivity[];
+}
+
+export const getAgentDashboard = async (): Promise<AgentDashboardResponse> => {
+    const response = await apiClient.get<AgentDashboardResponse>('/dashboard/agent');
+    return response.data;
+};

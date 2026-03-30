@@ -22,18 +22,22 @@ class SignalRService {
         try {
             await this.connection.start();
             console.log('SignalR connected successfully to: ', this.baseUrl);
-        } catch (err: any) {
-            if (err.message && err.message.includes("stopped during negotiation")) {
+        } catch (err: unknown) {
+            const error = err as Error;
+            if (error.message && error.message.includes("stopped during negotiation")) {
                 return;
             }
-            console.error('SignalR connection error: ', err);
+            console.error('SignalR connection error: ', error);
+            // Retry logic with backoff or simple timeout
             setTimeout(() => this.startConnection(), 5000);
         }
     }
 
     public onNotification(callback: (title: string, message: string) => void): void {
-        this.connection?.off('ReceiveNotification');
-        this.connection?.on('ReceiveNotification', (title, message) => {
+        if (!this.connection) return;
+
+        this.connection.off('ReceiveNotification');
+        this.connection.on('ReceiveNotification', (title: string, message: string) => {
             console.log('SignalR message received:', { title, message });
             callback(title, message);
         });

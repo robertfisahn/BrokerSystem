@@ -1,4 +1,5 @@
 import apiClient from '../../../api/apiClient';
+import { PaginatedResult } from '../../../api/types';
 
 export interface ClientListItem {
     clientId: number;
@@ -11,15 +12,6 @@ export interface ClientListItem {
     activePoliciesCount: number;
 }
 
-export interface PaginatedResult<T> {
-    items: T[];
-    totalCount: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
-    hasPreviousPage: boolean;
-    hasNextPage: boolean;
-}
 
 export interface GetClientsParams {
     page?: number;

@@ -5,9 +5,11 @@ import { Users, AlertCircle, Search, ArrowUpDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getClients, ClientListItem, GetClientsParams } from '../api/clientsApi'
 import { ClientsStatsCards } from '../components/ClientsStatsCards'
+import { useAuth } from '../../../providers/AuthProvider'
 
 export function ClientsDashboard() {
     const navigate = useNavigate()
+    const { user, isAgent } = useAuth()
     const [page, setPage] = useState(1)
     const [search, setSearch] = useState('')
     const [sortBy, setSortBy] = useState('clientId')
@@ -23,7 +25,7 @@ export function ClientsDashboard() {
     }
 
     const { data, isLoading, error } = useQuery({
-        queryKey: ['clients', params],
+        queryKey: ['clients', user?.role, params],
         queryFn: () => getClients(params),
     })
 
@@ -45,7 +47,7 @@ export function ClientsDashboard() {
         <Container size="xl" py="xl">
             <Group mb="lg">
                 <Users size={32} />
-                <Title order={1}>Klienci</Title>
+                <Title order={1}>{isAgent ? 'Twoi Klienci' : 'Wszyscy Klienci'}</Title>
             </Group>
 
             {/* Stats Cards */}
