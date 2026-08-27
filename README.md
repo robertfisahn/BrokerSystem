@@ -4,7 +4,7 @@ Nowoczesny i wydajny system typu **Modular Monolith** do zarządzania agencją u
 
 ---
 
-## 📸 Preview (System w akcji)
+## 📸 Preview
 
 ### 1. Ekran Logowania
 Profesjonalny, bezpieczny dostęp do systemu z podziałem na role (**Agent** / **Admin**). Panel automatycznie autoryzuje i kieruje użytkownika do odpowiedniego panelu roboczego.
@@ -41,10 +41,6 @@ Wbudowany podgląd generowanego dynamicznie przez silnik **QuestPDF** certyfikat
 ### 8. Dziennik Aktywności (Security & Audit Trail)
 Kompletna historia modyfikacji danych w systemie (kto, kiedy i jaką akcję wykonał). Zapewnia pełną transparentność i spełnia wymogi bezpieczeństwa/audytu.
 ![Audit Logs](docs/images/audit_logs.png)
-
-### 9. Szczegóły Zmiany (Audit Payload)
-Każdy wpis w dzienniku aktywności można rozwinąć, aby zobaczyć dokładny stan obiektu (payload JSON) przed lub po modyfikacji.
-![Audit Log Detail](docs/images/audit_log_detail.png)
 
 ---
 
@@ -95,4 +91,3 @@ BrokerSystem został stworzony, aby zautomatyzować procesy w agencjach brokersk
     ```
 
 ---
-*Projekt przygotowany jako showcase nowoczesnego programowania w ekosystemie .NET & React.*
